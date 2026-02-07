@@ -52,8 +52,15 @@ Update the verification evidence in `PROJECT.md` when tasks are completed.
 
 ## Scripts
 
-Use the script below to create a project from config or interactive prompts:
-- `scripts/cortex_gov_create.py`
+Use the scripts below:
+- `scripts/cortex_gov_create.py` — create PROJECT.md + HEARTBEAT.md
+- `scripts/cortex_gov_validate.py` — validate evidence; auto-advance VERIFY → DONE
+
+### Auto-verify toggle
+
+`cortex_gov_validate.py` accepts `--auto-verify true|false`.
+- **true (default):** auto-advance VERIFY → DONE
+- **false:** validate but stop for manual approval
 
 ## References
 
