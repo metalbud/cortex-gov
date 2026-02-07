@@ -19,3 +19,6 @@ Thumbs.db
 .env
 .env.*
 
+# Wizard-generated files (keep repo clean)
+tools/wizard/PROJECT.md
+tools/wizard/HEARTBEAT.md
