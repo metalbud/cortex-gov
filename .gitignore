@@ -29,3 +29,6 @@ tools/wizard/HEARTBEAT.md
 
 # Local scratch artifacts
 artifacts/_tmp*
+
+# Accidental nested copies
+skills/cortex-gov-project/cortex-gov-project/

@@ -1,13 +1,13 @@
 ---
 name: cortex-gov-project
-description: Create Cortex GOV project control files (PROJECT.md + HEARTBEAT.md) from a user’s idea and configure OpenClaw heartbeat for multi-agent governance. Use when a user wants a structured, evidence-based project plan, strict task status workflow (TODO→IN_PROGRESS→VERIFY→DONE), or asks to “turn my idea into a governed project.”
+description: Create Cortex GOV control docs (default: PROJECT.md) + HEARTBEAT.md and configure OpenClaw heartbeat for multi-agent governance.
 ---
 
 # Cortex GOV Project Creator
 
 ## Overview
 
-Generate a Cortex GOV project control document and OpenClaw-compatible HEARTBEAT.md from a user’s project idea, then place them in the workspace `/skills` and root for immediate agent execution.
+Generate a Cortex GOV control document (default: `PROJECT.md`, but can be named) and an OpenClaw-compatible `HEARTBEAT.md` from a user’s project idea, then place them in the workspace root for immediate agent execution.
 
 ## Workflow (follow in order)
 
@@ -26,41 +26,41 @@ Create `project_config.json` in the target project folder. Use the wizard-compat
 
 ### 3) Create project files with the wizard
 Use the bundled wizard (from the cortex-gov repo) to generate:
-- `PROJECT.md`
+- a control document (default: `PROJECT.md`, but can be named)
 - `HEARTBEAT.md`
 
 Use the script in `scripts/cortex_gov_create.py` (preferred) which wraps the wizard and places outputs in the workspace.
 
 ### 4) Place files for OpenClaw
 OpenClaw reads workspace skills and heartbeat files from the workspace root. Ensure:
-- `PROJECT.md` is in the workspace root
+- the control doc is in the workspace root (default: `PROJECT.md`)
 - `HEARTBEAT.md` is in the workspace root
 
 If the project lives in a subfolder, also keep a copy there.
 
 ### 5) Ensure multi-agent heartbeat format
-Heartbeat must include agent ID guidance, and workspace path:
+Heartbeat must include agent ID guidance, workspace path, and the chosen control doc name:
 
 ```
--Agent: Read PROJECT.md if it exists in workspace context. Follow the rules set in that doc strictly. Do not infer or repeat old tasks from prior chats. Complete the first available TODO task and update your status, then post a short summary of changes in #dev (discord) with your agent ID.
--If no task to do in PROJECT.md reply with HEARTBEAT OK and include your agent ID
+-Agent: Read <CONTROL_DOC> if it exists in workspace context. Follow the rules set in that doc strictly. Do not infer or repeat old tasks from prior chats. Complete the first available TODO task and update your status, then post a short summary of changes in #dev (discord) with your agent ID.
+-If no task to do in <CONTROL_DOC> reply with HEARTBEAT OK and include your agent ID
 -Workspace: <absolute workspace path>
 ```
 
 ### 6) Record evidence
-Update the verification evidence in `PROJECT.md` when tasks are completed.
+Update the verification evidence in the control doc when tasks are completed.
 
 ## Scripts
 
 Use the scripts below:
-- `scripts/cortex_gov_create.py` — create PROJECT.md + HEARTBEAT.md
+- `scripts/cortex_gov_create.py` — create control doc + `HEARTBEAT.md` (prints the chosen control doc name; supports `--control-doc`)
 - `scripts/cortex_gov_validate.py` — validate evidence; auto-advance VERIFY → DONE
 
 ### Auto-verify toggle
 
 `cortex_gov_validate.py` accepts `--auto-verify true|false`.
-- **true (default):** auto-advance VERIFY → DONE
-- **false:** validate but stop for manual approval
+- `true` (default): auto-advance VERIFY → DONE
+- `false`: validate but stop for manual approval
 
 ## References
 
@@ -71,4 +71,5 @@ Use the scripts below:
 
 - Never mark DONE without verification evidence.
 - Do not start a new task if one is IN_PROGRESS or VERIFY.
-- Keep PROJECT.md as the single source of truth.
+- Keep the control doc as the single source of truth.
+

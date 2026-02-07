@@ -13,6 +13,7 @@ Optional:
 Notes:
 - This script intentionally prefers clarity over cleverness.
 - It produces a deterministic, agent-friendly Markdown control document.
+- In interactive mode, if `--out` is omitted, it will prompt for an easy-to-type control document filename.
 """
 
 from __future__ import annotations
@@ -22,6 +23,8 @@ import os
 import re
 from dataclasses import dataclass, asdict
 from typing import List, Optional
+
+MAX_FILENAME_LEN = 64
 
 DEFAULT_RULES = [
     "Only one task may be IN_PROGRESS at a time.",
@@ -48,6 +51,35 @@ def slugify(s: str) -> str:
     s = s.strip().lower()
     s = re.sub(r"[^a-z0-9]+", "-", s)
     return s.strip("-") or "project"
+
+def normalize_md_filename(raw: str, default_name: str) -> str:
+    """
+    Return a human-typable markdown filename (no directories).
+
+    Rules:
+    - Always ends with .md
+    - Only [a-z0-9._-] characters
+    - Length capped for easy typing
+    """
+    val = (raw or "").strip()
+    if not val:
+        return default_name
+
+    val = os.path.basename(val)
+    val = val.strip().strip('"').strip("'")
+    if not val:
+        return default_name
+
+    if not val.lower().endswith(".md"):
+        val = f"{val}.md"
+
+    stem = val[:-3]
+    safe_stem = re.sub(r"[^a-zA-Z0-9._-]+", "-", stem).strip("-._")
+    safe_stem = safe_stem[: max(1, MAX_FILENAME_LEN - 3)]
+    if not safe_stem:
+        return default_name
+
+    return f"{safe_stem}.md"
 
 def ask(prompt: str, default: Optional[str] = None) -> str:
     if default:
@@ -286,10 +318,34 @@ def load_config(path: str) -> ProjectConfig:
         tasks=tasks
     )
 
+def choose_output_paths(args, cfg: ProjectConfig):
+    default_project = "PROJECT.md"
+    default_heartbeat = "HEARTBEAT.md"
+
+    out_path = args.out
+    heartbeat_path = args.heartbeat_out
+
+    # Non-interactive: never prompt.
+    if args.non_interactive:
+        return out_path or default_project, heartbeat_path or default_heartbeat
+
+    # Interactive: if not provided, prompt (and avoid overwriting if possible).
+    if not out_path:
+        suggested = default_project
+        if os.path.exists(default_project):
+            suggested = normalize_md_filename(f"PROJECT-{cfg.project_slug}.md", default_project)
+        raw = ask("Control document filename (easy to type)", suggested)
+        out_path = normalize_md_filename(raw, suggested)
+
+    if not heartbeat_path:
+        heartbeat_path = default_heartbeat
+
+    return out_path, heartbeat_path
+
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--out", default="PROJECT.md", help="Output markdown file path")
-    ap.add_argument("--heartbeat-out", default="HEARTBEAT.md", help="Output HEARTBEAT.md path")
+    ap.add_argument("--out", default=None, help="Output markdown file path (default: PROJECT.md; interactive mode can prompt)")
+    ap.add_argument("--heartbeat-out", default=None, help="Output HEARTBEAT.md path (default: HEARTBEAT.md)")
     ap.add_argument("--control-doc", default=None, help="Path/name of the control doc agents should follow (defaults to --out basename)")
     ap.add_argument("--non-interactive", action="store_true", help="Use --config and do not prompt")
     ap.add_argument("--config", help="Path to JSON config for non-interactive mode")
@@ -302,20 +358,23 @@ def main():
     else:
         cfg = interactive_build()
 
+    out_path, heartbeat_out = choose_output_paths(args, cfg)
     md = to_markdown(cfg)
-    with open(args.out, "w", encoding="utf-8") as f:
+    with open(out_path, "w", encoding="utf-8") as f:
         f.write(md)
 
-    control_doc = args.control_doc or os.path.basename(args.out)
+    control_doc = args.control_doc or os.path.basename(out_path)
     heartbeat_lines = [
         f"-Check {control_doc} read and follow the rules set in that doc complete a task and update your status, then post a short summary of changes in #dev (discord)",
         f"-If no task to do {control_doc} reply with HEARTBEAT OK",
     ]
-    with open(args.heartbeat_out, "w", encoding="utf-8") as hf:
+    with open(heartbeat_out, "w", encoding="utf-8") as hf:
         hf.write("\n".join(heartbeat_lines) + "\n")
 
-    print(f"\nWrote: {args.out}")
-    print("Next: commit PROJECT.md to your repo. Point your agent loop at it as the single source of truth.\n")
+    print(f"\nWrote: {out_path}")
+    print(f"Wrote: {heartbeat_out}")
+    print(f"Heartbeat control doc: {control_doc}")
+    print("Next: commit your control doc + HEARTBEAT.md to your repo.\n")
 
 if __name__ == "__main__":
     main()

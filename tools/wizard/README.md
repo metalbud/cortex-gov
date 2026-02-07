@@ -1,6 +1,6 @@
 # Cortex GOV Wizard (Heartbeat Compatible)
 
-This folder contains a cross-platform CLI wizard that helps a human create a Cortex GOV project control document (`PROJECT.md`) and an OpenClaw-compatible `HEARTBEAT.md`.
+This folder contains a cross-platform CLI wizard that helps a human create a Cortex GOV project control document and an OpenClaw-compatible `HEARTBEAT.md`.
 
 ## What it does
 - Prompts a human for project name, summary, constraints
@@ -10,7 +10,7 @@ This folder contains a cross-platform CLI wizard that helps a human create a Cor
 - Writes `HEARTBEAT.md` instructions that direct your Heartbeat system to the control doc
 
 ## Outputs
-- `PROJECT.md` (default) — the single source of truth the agent must read/write
+- A control document (default: `PROJECT.md`) — the single source of truth the agent must read/write
 - `HEARTBEAT.md` (default) — a short instruction file for OpenClaw Heartbeat
 
 ## Requirements
@@ -20,11 +20,13 @@ This folder contains a cross-platform CLI wizard that helps a human create a Cor
 From this folder:
 
 ```bash
-python cortex_gov_wizard.py --out PROJECT.md --heartbeat-out HEARTBEAT.md
+python cortex_gov_wizard.py
 ```
 
+In interactive mode, the wizard will prompt for an **easy-to-type** control document filename if `--out` is not provided.
+
 ## Point Heartbeat at a different control document name
-If you name your control doc something else (e.g., CONTROL_DOC.md), pass `--control-doc`:
+If you name your control doc something else (e.g., `CONTROL_DOC.md`), pass `--control-doc`:
 
 ```bash
 python cortex_gov_wizard.py --out CONTROL_DOC.md --control-doc CONTROL_DOC.md
@@ -45,3 +47,4 @@ The wizard writes `HEARTBEAT.md` in this format:
 
 ## Tip
 Keep evidence artifacts in `/artifacts/` and link them from each task’s "Verification Evidence" section.
+

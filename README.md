@@ -102,14 +102,14 @@ Heartbeat
    ↓ (reads)
 HEARTBEAT.md
    ↓ (points to)
-PROJECT.md
+<CONTROL_DOC>
    ↓ (governs)
 AI Agent
    ↓
 artifacts/ + src/
 ```
 
-- **PROJECT.md** is the single source of truth
+- The control doc (default: **PROJECT.md**) is the single source of truth
 - **HEARTBEAT.md** sets execution rhythm
 - Agents read, act, verify, and update status
 - Humans review evidence, not guesses
@@ -129,6 +129,8 @@ The fastest way to start is the **Cortex GOV Wizard**.
 ```bash
 python tools/wizard/cortex_gov_wizard.py
 ```
+
+In interactive mode, the wizard will prompt for an **easy-to-type** control document filename if you donâ€™t pass `--out` (default: `PROJECT.md`). It also prints the chosen name so you can reference it in your terminal and in `HEARTBEAT.md`.
 
 This generates:
 - `PROJECT.md` — the control document
@@ -175,8 +177,8 @@ Cortex GOV pairs naturally with OpenClaw Heartbeat.
 Example `HEARTBEAT.md`:
 
 ```
--Check PROJECT.md read and follow the rules set in that doc complete a task and update your status, then post a short summary of changes in #dev (discord)
--If no task to do PROJECT.md reply with HEARTBEAT OK
+-Check <CONTROL_DOC> read and follow the rules set in that doc complete a task and update your status, then post a short summary of changes in #dev (discord)
+-If no task to do <CONTROL_DOC> reply with HEARTBEAT OK
 ```
 
 ---
