@@ -24,10 +24,10 @@ python cortex_gov_wizard.py --out PROJECT.md --heartbeat-out HEARTBEAT.md
 ```
 
 ## Point Heartbeat at a different control document name
-If you name your control doc something else (e.g., BLOG_PLATFORM_HANDOFF.md), pass `--control-doc`:
+If you name your control doc something else (e.g., CONTROL_DOC.md), pass `--control-doc`:
 
 ```bash
-python cortex_gov_wizard.py --out BLOG_PLATFORM_HANDOFF.md --control-doc BLOG_PLATFORM_HANDOFF.md
+python cortex_gov_wizard.py --out CONTROL_DOC.md --control-doc CONTROL_DOC.md
 ```
 
 ## Non-interactive mode

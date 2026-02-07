@@ -1,0 +1,147 @@
+{
+  "project_name": "Recipe Community App",
+  "project_slug": "recipe-community-app",
+  "summary": "A generic community app for sharing recipes, with basic moderation and planning features.",
+  "constraints": [
+    "User-generated content must be moderatable",
+    "Reasonable privacy defaults for profiles",
+    "Mobile-first UI"
+  ],
+  "epics": [
+    {
+      "key": "E001",
+      "title": "Core Experience",
+      "outcome": [
+        "Accounts and profiles",
+        "Create, browse, and search content"
+      ]
+    },
+    {
+      "key": "E002",
+      "title": "Community + Planning",
+      "outcome": [
+        "Reporting/moderation workflow",
+        "Planning features (favorites, lists)"
+      ]
+    }
+  ],
+  "tasks": [
+    {
+      "key": "H001",
+      "title": "Accounts and profiles",
+      "epic": "E001",
+      "status": "TODO",
+      "priority": "P0",
+      "owner": "agent",
+      "work": [
+        "Implement sign up/sign in",
+        "Create profile view/edit",
+        "Add basic session handling"
+      ],
+      "acceptance": [
+        "Users can sign up and sign in",
+        "Users can edit a display name and bio",
+        "Sessions persist across refresh"
+      ],
+      "verification_steps": [
+        "Create a user account and sign in",
+        "Edit profile and confirm changes persist",
+        "Refresh page and confirm session remains valid"
+      ],
+      "evidence_fields": [
+        "Commands/output",
+        "Screenshots",
+        "File paths",
+        "Notes"
+      ]
+    },
+    {
+      "key": "H002",
+      "title": "Recipe CRUD + search",
+      "epic": "E001",
+      "status": "TODO",
+      "priority": "P1",
+      "owner": "agent",
+      "work": [
+        "Create recipe form (title, ingredients, steps)",
+        "Implement browse/list view",
+        "Add simple search/filter"
+      ],
+      "acceptance": [
+        "Users can create and view a recipe",
+        "Recipe list displays multiple items",
+        "Search returns relevant results"
+      ],
+      "verification_steps": [
+        "Create 2-3 recipes",
+        "Verify list and detail pages load correctly",
+        "Search by keyword and confirm expected filtering"
+      ],
+      "evidence_fields": [
+        "Screenshots",
+        "File paths",
+        "Commands/output",
+        "Notes"
+      ]
+    },
+    {
+      "key": "H003",
+      "title": "Reporting and moderation basics",
+      "epic": "E002",
+      "status": "TODO",
+      "priority": "P1",
+      "owner": "agent",
+      "work": [
+        "Add report button for user-generated content",
+        "Create a simple moderation queue view",
+        "Allow moderator actions (hide/remove/restore)"
+      ],
+      "acceptance": [
+        "Users can submit a report with a reason",
+        "Moderators can view reported items",
+        "Moderator actions affect visibility"
+      ],
+      "verification_steps": [
+        "Submit a report on a recipe",
+        "View it in the moderation queue",
+        "Hide and restore the item and confirm UI updates"
+      ],
+      "evidence_fields": [
+        "Screenshots",
+        "Commands/output",
+        "File paths",
+        "Notes"
+      ]
+    },
+    {
+      "key": "H004",
+      "title": "Favorites and planning list",
+      "epic": "E002",
+      "status": "TODO",
+      "priority": "P2",
+      "owner": "agent",
+      "work": [
+        "Add favorites/bookmarks for recipes",
+        "Create a planning list (e.g., week list)",
+        "Allow adding/removing items from the list"
+      ],
+      "acceptance": [
+        "Users can favorite and unfavorite recipes",
+        "Users can add recipes to a planning list",
+        "Planning list persists for the user"
+      ],
+      "verification_steps": [
+        "Favorite a recipe and verify it appears in favorites",
+        "Add 2 recipes to a planning list and refresh",
+        "Remove one and confirm persistence"
+      ],
+      "evidence_fields": [
+        "Screenshots",
+        "Commands/output",
+        "File paths",
+        "Notes"
+      ]
+    }
+  ]
+}
+

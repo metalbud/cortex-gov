@@ -1,117 +1,176 @@
 {
   "project_name": "General Web Application",
-  "project_type": "react-nextjs",
-  "description": "A flexible template for modern web applications with authentication, databases, and deployment",
+  "project_slug": "general-web-application",
+  "summary": "A generic full-stack web app with authentication, database access, APIs, and a responsive UI.",
+  "constraints": [
+    "Secure by default",
+    "Reasonable performance baseline",
+    "Accessible UI components"
+  ],
   "epics": [
     {
-      "id": "E001",
-      "name": "Core Application Structure",
-      "outcome": "Complete web application with user management and data handling",
-      "tasks": [
-        {
-          "id": "T001",
-          "name": "Authentication System",
-          "priority": "P0",
-          "acceptance": [
-            "User registration and login",
-            "JWT token management",
-            "Password reset functionality",
-            "Role-based access control"
-          ]
-        },
-        {
-          "id": "T002",
-          "name": "Database Integration",
-          "priority": "P0",
-          "acceptance": [
-            "Schema design and models",
-            "CRUD operations",
-            "Data validation",
-            "Error handling"
-          ]
-        },
-        {
-          "id": "T003",
-          "name": "API Development",
-          "priority": "P1",
-          "acceptance": [
-            "RESTful API endpoints",
-            "Request/response validation",
-            "Error handling middleware",
-            "Rate limiting"
-          ]
-        }
+      "key": "E001",
+      "title": "Core Backend",
+      "outcome": [
+        "Authentication and authorization",
+        "Database-backed API endpoints"
       ]
     },
     {
-      "id": "E002",
-      "name": "User Interface",
-      "outcome": "Responsive and accessible user interface",
-      "tasks": [
-        {
-          "id": "T004",
-          "name": "UI Components",
-          "priority": "P1",
-          "acceptance": [
-            "Reusable component library",
-            "Responsive design system",
-            "Dark/light theme support",
-            "Accessibility compliance"
-          ]
-        },
-        {
-          "id": "T005",
-          "name": "Form Handling",
-          "priority": "P2",
-          "acceptance": [
-            "Form validation",
-            "State management",
-            "File uploads",
-            "Auto-save functionality"
-          ]
-        }
+      "key": "E002",
+      "title": "Frontend UI",
+      "outcome": [
+        "Reusable UI components",
+        "Validated forms and good UX"
       ]
     }
   ],
-  "features": {
-    "authentication": true,
-    "database": true,
-    "api_endpoints": true,
-    "responsive_ui": true,
-    "forms": true,
-    "email_notifications": true,
-    "file_uploads": true,
-    "caching": true
-  },
-  "tech_stack": {
-    "frontend": ["Next.js", "React", "TypeScript", "Tailwind CSS"],
-    "backend": ["Node.js", "Express"],
-    "database": ["PostgreSQL", "Prisma ORM"],
-    "authentication": ["NextAuth.js"],
-    "deployment": ["Vercel", "Docker"],
-    "monitoring": ["Sentry", "Analytics"]
-  },
-  "security": {
-    "csrf_protection": true,
-    "rate_limiting": true,
-    "input_validation": true,
-    "secure_headers": true
-  },
-  "performance": {
-    "image_optimization": true,
-    "code_splitting": true,
-    "caching_strategies": true,
-    "seo_optimization": true
-  },
-  "heartbeat_config": {
-    "interval_minutes": 20,
-    "update_channel": "discord",
-    "include_agent_id": true,
-    "checklist": [
-      "authentication_system_status",
-      "database_connection_health",
-      "api_endpoint_availability",
-      "ui_performance_metrics"
-    ]
-  }
+  "tasks": [
+    {
+      "key": "H001",
+      "title": "Authentication system",
+      "epic": "E001",
+      "status": "TODO",
+      "priority": "P0",
+      "owner": "agent",
+      "work": [
+        "Implement sign up/sign in",
+        "Add session handling",
+        "Add basic role/permission checks"
+      ],
+      "acceptance": [
+        "Users can sign up and sign in",
+        "Sessions persist across refresh",
+        "Protected routes enforce auth"
+      ],
+      "verification_steps": [
+        "Create an account and sign in",
+        "Refresh and verify session still valid",
+        "Attempt to access a protected route while signed out"
+      ],
+      "evidence_fields": [
+        "Commands/output",
+        "Screenshots",
+        "File paths",
+        "Notes"
+      ]
+    },
+    {
+      "key": "H002",
+      "title": "Database integration",
+      "epic": "E001",
+      "status": "TODO",
+      "priority": "P0",
+      "owner": "agent",
+      "work": [
+        "Define a minimal schema/model",
+        "Implement CRUD operations",
+        "Add basic validation and error handling"
+      ],
+      "acceptance": [
+        "Create/read/update/delete work end-to-end",
+        "Invalid input returns a clear error",
+        "Database connection is configurable"
+      ],
+      "verification_steps": [
+        "Run migrations/setup for the schema",
+        "Create a record and fetch it back",
+        "Attempt invalid input and confirm error handling"
+      ],
+      "evidence_fields": [
+        "Commands/output",
+        "File paths",
+        "Notes",
+        "URLs"
+      ]
+    },
+    {
+      "key": "H003",
+      "title": "API endpoints",
+      "epic": "E001",
+      "status": "TODO",
+      "priority": "P1",
+      "owner": "agent",
+      "work": [
+        "Create REST endpoints for core resources",
+        "Add request/response validation",
+        "Add basic rate limiting (if applicable)"
+      ],
+      "acceptance": [
+        "Endpoints return correct status codes",
+        "Validation errors are consistent",
+        "Basic abuse protection exists (if needed)"
+      ],
+      "verification_steps": [
+        "Call endpoints with valid and invalid payloads",
+        "Confirm status codes and error messages",
+        "Run a small smoke test script or curl commands"
+      ],
+      "evidence_fields": [
+        "Commands/output",
+        "File paths",
+        "Notes",
+        "URLs"
+      ]
+    },
+    {
+      "key": "H004",
+      "title": "UI components baseline",
+      "epic": "E002",
+      "status": "TODO",
+      "priority": "P1",
+      "owner": "agent",
+      "work": [
+        "Create a small component set (buttons, inputs, cards)",
+        "Ensure responsive layout baseline",
+        "Add a11y considerations (labels, focus states)"
+      ],
+      "acceptance": [
+        "Components are reusable across pages",
+        "Layout works on mobile and desktop",
+        "Forms are accessible (labels, focus, keyboard)"
+      ],
+      "verification_steps": [
+        "Render components in at least one page",
+        "Resize viewport to confirm responsiveness",
+        "Keyboard-navigate a form and confirm focus behavior"
+      ],
+      "evidence_fields": [
+        "Screenshots",
+        "File paths",
+        "Notes",
+        "Commands/output"
+      ]
+    },
+    {
+      "key": "H005",
+      "title": "Form handling and validation",
+      "epic": "E002",
+      "status": "TODO",
+      "priority": "P2",
+      "owner": "agent",
+      "work": [
+        "Add client-side validation rules",
+        "Show field-level errors",
+        "Handle loading and error states for submissions"
+      ],
+      "acceptance": [
+        "Invalid submissions show clear errors",
+        "Valid submissions succeed and show confirmation",
+        "Loading/error states are visible and consistent"
+      ],
+      "verification_steps": [
+        "Submit invalid values and confirm errors",
+        "Submit valid values and confirm success state",
+        "Simulate server failure and confirm error UI"
+      ],
+      "evidence_fields": [
+        "Screenshots",
+        "File paths",
+        "Commands/output",
+        "Notes"
+      ]
+    }
+  ]
 }
+

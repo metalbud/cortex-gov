@@ -1,0 +1,147 @@
+{
+  "project_name": "Content Site",
+  "project_slug": "content-site",
+  "summary": "A generic marketing/content site with an SEO baseline and a simple publishing workflow.",
+  "constraints": [
+    "Static-first where possible",
+    "Accessibility-first (WCAG-minded)",
+    "Fast page loads (performance budget)"
+  ],
+  "epics": [
+    {
+      "key": "E001",
+      "title": "Site Foundation",
+      "outcome": [
+        "Pages, navigation, and layout templates",
+        "SEO + performance baseline"
+      ]
+    },
+    {
+      "key": "E002",
+      "title": "Publishing Workflow",
+      "outcome": [
+        "Repeatable content authoring workflow",
+        "Tags/categories and basic discovery"
+      ]
+    }
+  ],
+  "tasks": [
+    {
+      "key": "H001",
+      "title": "Initialize site skeleton",
+      "epic": "E001",
+      "status": "TODO",
+      "priority": "P0",
+      "owner": "agent",
+      "work": [
+        "Create the basic project structure",
+        "Add a minimal home page and global layout",
+        "Add a simple navigation header/footer"
+      ],
+      "acceptance": [
+        "Project runs locally",
+        "Home page renders with shared layout",
+        "Navigation links are present"
+      ],
+      "verification_steps": [
+        "Run the dev server",
+        "Click navigation links to confirm routing",
+        "Confirm layout is shared across pages"
+      ],
+      "evidence_fields": [
+        "File paths",
+        "Commands/output",
+        "Screenshots",
+        "Notes"
+      ]
+    },
+    {
+      "key": "H002",
+      "title": "Add SEO + performance baseline",
+      "epic": "E001",
+      "status": "TODO",
+      "priority": "P1",
+      "owner": "agent",
+      "work": [
+        "Add meta tags and social previews for key pages",
+        "Add a sitemap and robots.txt",
+        "Ensure images and assets are optimized"
+      ],
+      "acceptance": [
+        "Key pages include title/description tags",
+        "Sitemap and robots.txt exist",
+        "Images are optimized and not oversized"
+      ],
+      "verification_steps": [
+        "Inspect generated HTML head tags",
+        "Confirm sitemap/robots endpoints or files exist",
+        "Run a basic lighthouse/perf check"
+      ],
+      "evidence_fields": [
+        "File paths",
+        "Commands/output",
+        "URLs",
+        "Notes"
+      ]
+    },
+    {
+      "key": "H003",
+      "title": "Implement content pipeline",
+      "epic": "E002",
+      "status": "TODO",
+      "priority": "P1",
+      "owner": "agent",
+      "work": [
+        "Add a content folder and parsing strategy (e.g., Markdown)",
+        "Create a listing page for posts/articles",
+        "Create a detail page for a single post/article"
+      ],
+      "acceptance": [
+        "At least one sample content item renders",
+        "Listing page shows items with title/date",
+        "Detail page renders content with formatting"
+      ],
+      "verification_steps": [
+        "Add a sample content file",
+        "Load listing and detail pages in the browser",
+        "Confirm links between listing and detail work"
+      ],
+      "evidence_fields": [
+        "File paths",
+        "Screenshots",
+        "Commands/output",
+        "Notes"
+      ]
+    },
+    {
+      "key": "H004",
+      "title": "Add deployment checklist",
+      "epic": "E002",
+      "status": "TODO",
+      "priority": "P2",
+      "owner": "agent",
+      "work": [
+        "Document environment variables (if any)",
+        "Document build and deploy commands",
+        "Add a basic monitoring/analytics option"
+      ],
+      "acceptance": [
+        "README includes build/deploy steps",
+        "Any env vars are documented",
+        "Analytics/monitoring choice is documented"
+      ],
+      "verification_steps": [
+        "Review README for completeness",
+        "Run the production build locally",
+        "Confirm deploy steps are reproducible"
+      ],
+      "evidence_fields": [
+        "File paths",
+        "Commands/output",
+        "Notes",
+        "URLs"
+      ]
+    }
+  ]
+}
+

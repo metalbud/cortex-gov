@@ -19,6 +19,13 @@ Thumbs.db
 .env
 .env.*
 
+# Wizard outputs (repo root)
+PROJECT.md
+HEARTBEAT.md
+
 # Wizard-generated files (keep repo clean)
 tools/wizard/PROJECT.md
 tools/wizard/HEARTBEAT.md
+
+# Local scratch artifacts
+artifacts/_tmp*
