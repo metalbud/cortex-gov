@@ -1,0 +1,117 @@
+{
+  "project_name": "General Web Application",
+  "project_type": "react-nextjs",
+  "description": "A flexible template for modern web applications with authentication, databases, and deployment",
+  "epics": [
+    {
+      "id": "E001",
+      "name": "Core Application Structure",
+      "outcome": "Complete web application with user management and data handling",
+      "tasks": [
+        {
+          "id": "T001",
+          "name": "Authentication System",
+          "priority": "P0",
+          "acceptance": [
+            "User registration and login",
+            "JWT token management",
+            "Password reset functionality",
+            "Role-based access control"
+          ]
+        },
+        {
+          "id": "T002",
+          "name": "Database Integration",
+          "priority": "P0",
+          "acceptance": [
+            "Schema design and models",
+            "CRUD operations",
+            "Data validation",
+            "Error handling"
+          ]
+        },
+        {
+          "id": "T003",
+          "name": "API Development",
+          "priority": "P1",
+          "acceptance": [
+            "RESTful API endpoints",
+            "Request/response validation",
+            "Error handling middleware",
+            "Rate limiting"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "E002",
+      "name": "User Interface",
+      "outcome": "Responsive and accessible user interface",
+      "tasks": [
+        {
+          "id": "T004",
+          "name": "UI Components",
+          "priority": "P1",
+          "acceptance": [
+            "Reusable component library",
+            "Responsive design system",
+            "Dark/light theme support",
+            "Accessibility compliance"
+          ]
+        },
+        {
+          "id": "T005",
+          "name": "Form Handling",
+          "priority": "P2",
+          "acceptance": [
+            "Form validation",
+            "State management",
+            "File uploads",
+            "Auto-save functionality"
+          ]
+        }
+      ]
+    }
+  ],
+  "features": {
+    "authentication": true,
+    "database": true,
+    "api_endpoints": true,
+    "responsive_ui": true,
+    "forms": true,
+    "email_notifications": true,
+    "file_uploads": true,
+    "caching": true
+  },
+  "tech_stack": {
+    "frontend": ["Next.js", "React", "TypeScript", "Tailwind CSS"],
+    "backend": ["Node.js", "Express"],
+    "database": ["PostgreSQL", "Prisma ORM"],
+    "authentication": ["NextAuth.js"],
+    "deployment": ["Vercel", "Docker"],
+    "monitoring": ["Sentry", "Analytics"]
+  },
+  "security": {
+    "csrf_protection": true,
+    "rate_limiting": true,
+    "input_validation": true,
+    "secure_headers": true
+  },
+  "performance": {
+    "image_optimization": true,
+    "code_splitting": true,
+    "caching_strategies": true,
+    "seo_optimization": true
+  },
+  "heartbeat_config": {
+    "interval_minutes": 20,
+    "update_channel": "discord",
+    "include_agent_id": true,
+    "checklist": [
+      "authentication_system_status",
+      "database_connection_health",
+      "api_endpoint_availability",
+      "ui_performance_metrics"
+    ]
+  }
+}

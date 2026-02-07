@@ -1,0 +1,129 @@
+{
+  "project_name": "Cortex Government AI System",
+  "project_slug": "cortex-gov-ai",
+  "summary": "AI-assisted project automation system with strict governance rules for human-led, AI-executed workflows.",
+  "constraints": [
+    "Document-driven workflow",
+    "Strict task status management",
+    "Evidence-based verification",
+    "Cross-platform compatibility"
+  ],
+  "epics": [
+    {
+      "key": "E001",
+      "title": "Core Infrastructure",
+      "outcome": [
+        "Project control document system",
+        "Agent execution framework",
+        "Verification and evidence tracking"
+      ]
+    },
+    {
+      "key": "E002",
+      "title": "Tooling and Automation",
+      "outcome": [
+        "Project creation wizard",
+        "Heartbeat integration",
+        "Status monitoring tools"
+      ]
+    },
+    {
+      "key": "E003",
+      "title": "Governance Framework",
+      "outcome": [
+        "Task selection rules",
+        "Status transition validation",
+        "Evidence collection standards"
+      ]
+    }
+  ],
+  "tasks": [
+    {
+      "key": "H001",
+      "title": "Implement wizard system",
+      "epic": "E002",
+      "status": "DONE",
+      "priority": "P0",
+      "owner": "agent",
+      "work": [
+        "Create interactive wizard script",
+        "Add project template generation",
+        "Implement heartbeat integration"
+      ],
+      "acceptance": [
+        "Wizard runs successfully",
+        "Generates valid PROJECT.md",
+        "Creates proper HEARTBEAT.md"
+      ],
+      "verification_steps": [
+        "Test wizard execution",
+        "Validate output files",
+        "Verify heartbeat compatibility"
+      ],
+      "evidence_fields": [
+        "URLs",
+        "File paths",
+        "Commands/output",
+        "Notes"
+      ]
+    },
+    {
+      "key": "H002",
+      "title": "Create example projects",
+      "epic": "E002",
+      "status": "TODO",
+      "priority": "P1",
+      "owner": "agent",
+      "work": [
+        "Generate sample project configurations",
+        "Create documentation examples",
+        "Test wizard with different inputs"
+      ],
+      "acceptance": [
+        "Multiple examples created",
+        "Documentation complete",
+        "All examples functional"
+      ],
+      "verification_steps": [
+        "Run each example",
+        "Validate generated documents",
+        "Test edge cases"
+      ],
+      "evidence_fields": [
+        "URLs",
+        "File paths",
+        "Commands/output",
+        "Notes"
+      ]
+    },
+    {
+      "key": "H003",
+      "title": "Add validation framework",
+      "epic": "E003",
+      "status": "TODO",
+      "priority": "P0",
+      "owner": "agent",
+      "work": [
+        "Create document validation logic",
+        "Implement task rule checking",
+        "Add evidence validation"
+      ],
+      "acceptance": [
+        "Documents validate successfully",
+        "Rules enforced properly",
+        "Evidence requirements met"
+      ],
+      "verification_steps": [
+        "Test invalid documents",
+        "Verify rule enforcement",
+        "Check evidence collection"
+      ],
+      "evidence_fields": [
+        "URLs",
+        "File paths",
+        "Commands/output",
+        "Notes"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,53 @@
+{
+  "project_name": "Example Project",
+  "project_slug": "example-project",
+  "summary": "Build a minimal example project using Cortex GOV.",
+  "constraints": [
+    "Cross-platform",
+    "No paid services"
+  ],
+  "epics": [
+    {
+      "key": "E001",
+      "title": "Foundation",
+      "outcome": [
+        "Project skeleton exists",
+        "Basic workflow documented"
+      ]
+    },
+    {
+      "key": "E002",
+      "title": "Automation",
+      "outcome": [
+        "Agent can select tasks",
+        "Verification gates enforced"
+      ]
+    }
+  ],
+  "tasks": [
+    {
+      "key": "H001",
+      "title": "Initialize repo structure",
+      "epic": "E001",
+      "status": "TODO",
+      "priority": "P0",
+      "owner": "agent",
+      "work": [
+        "Create /src, /artifacts, PROJECT.md"
+      ],
+      "acceptance": [
+        "Repo has standard folders",
+        "PROJECT.md exists"
+      ],
+      "verification_steps": [
+        "List directory tree and confirm folders"
+      ],
+      "evidence_fields": [
+        "URLs",
+        "File paths",
+        "Commands/output",
+        "Notes"
+      ]
+    }
+  ]
+}
