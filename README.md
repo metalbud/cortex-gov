@@ -178,8 +178,20 @@ Example `HEARTBEAT.md`:
 
 ```
 -Check <CONTROL_DOC> read and follow the rules set in that doc complete a task and update your status, then post a short summary of changes in #dev (discord)
--If no task to do <CONTROL_DOC> reply with HEARTBEAT OK
+-If no task to do <CONTROL_DOC> reply with HEARTBEAT_OK
 ```
+
+### Short slash command (`/gov`)
+
+If you load the workspace skills, you can use the `gov` skill as a short slash command to:
+- create a per-project folder (control doc + heartbeat checklist)
+- spawn OpenClaw isolated agents that are directed to that project's `PROJECT.md`
+
+Typical usage:
+
+- `/gov` (guided): asks for project name + a 1-2 sentence idea, then creates `./projects/<slug>/PROJECT.md` and spawns a project agent.
+- `/gov MyProject` (guided): same, with the name pre-filled.
+- `/gov spawn <projectDir>`: spawns/configures agents for an existing project folder.
 
 ---
 

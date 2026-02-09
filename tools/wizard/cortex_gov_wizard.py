@@ -366,7 +366,7 @@ def main():
     control_doc = args.control_doc or os.path.basename(out_path)
     heartbeat_lines = [
         f"-Check {control_doc} read and follow the rules set in that doc complete a task and update your status, then post a short summary of changes in #dev (discord)",
-        f"-If no task to do {control_doc} reply with HEARTBEAT OK",
+        f"-If no task to do {control_doc} reply with HEARTBEAT_OK",
     ]
     with open(heartbeat_out, "w", encoding="utf-8") as hf:
         hf.write("\n".join(heartbeat_lines) + "\n")

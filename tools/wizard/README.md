@@ -43,8 +43,7 @@ python cortex_gov_wizard.py --non-interactive --config project_config.json --out
 The wizard writes `HEARTBEAT.md` in this format:
 
 -Check <CONTROL_DOC> read and follow the rules set in that doc complete a task and update your status, then post a short summary of changes in #dev (discord)
--If no task to do <CONTROL_DOC> reply with HEARTBEAT OK
+-If no task to do <CONTROL_DOC> reply with HEARTBEAT_OK
 
 ## Tip
 Keep evidence artifacts in `/artifacts/` and link them from each task’s "Verification Evidence" section.
-

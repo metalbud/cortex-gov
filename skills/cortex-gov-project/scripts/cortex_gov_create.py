@@ -15,16 +15,49 @@ import subprocess
 from pathlib import Path
 from typing import Optional
 
-REPO_ROOT = Path(__file__).resolve().parents[3]
-WIZARD_PATH = REPO_ROOT / "tools" / "wizard" / "cortex_gov_wizard.py"
+DEFAULT_WIZARD_REL = Path("tools") / "wizard" / "cortex_gov_wizard.py"
 
 MULTI_AGENT_HEARTBEAT = (
 "-Agent: Read {control_doc} if it exists in workspace context. Follow the rules set in that doc strictly. "
 "Do not infer or repeat old tasks from prior chats. Complete the first available TODO task and update your status, "
 "then post a short summary of changes in #dev (discord) with your agent ID.\n"
-"-If no task to do in {control_doc} reply with HEARTBEAT OK and include your agent ID\n"
+"-If no task to do in {control_doc} reply with HEARTBEAT_OK and include your agent ID\n"
 "-Workspace: {workspace}\n"
 )
+
+def find_wizard_path() -> Path:
+    """
+    Locate the Cortex GOV wizard script.
+
+    Supports:
+    - Running inside the cortex-gov repo (skill lives at <repo>/skills/...)
+    - Running from a workspace that contains the cortex-gov repo as a subfolder
+      (skill lives at <workspace>/skills/...)
+    - Explicit override via CORTEX_GOV_REPO env var
+    """
+    env_root = (os.environ.get("CORTEX_GOV_REPO") or "").strip()
+    if env_root:
+        candidate = Path(env_root) / DEFAULT_WIZARD_REL
+        if candidate.exists():
+            return candidate
+
+    script_path = Path(__file__).resolve()
+    base = script_path.parents[3]  # <repo> when in cortex-gov; <workspace> when copied to workspace skills
+
+    candidates = [
+        base / DEFAULT_WIZARD_REL,
+        base / "cortex-gov" / DEFAULT_WIZARD_REL,
+        Path.cwd() / DEFAULT_WIZARD_REL,
+        Path.cwd() / "cortex-gov" / DEFAULT_WIZARD_REL,
+    ]
+    for c in candidates:
+        if c.exists():
+            return c
+
+    raise SystemExit(
+        "Could not find cortex_gov_wizard.py. Set CORTEX_GOV_REPO to the cortex-gov repo root, "
+        "or ensure tools/wizard/cortex_gov_wizard.py exists (repo root or ./cortex-gov/...)."
+    )
 
 
 def write_heartbeat(workspace: Path, control_doc: str):
@@ -34,9 +67,10 @@ def write_heartbeat(workspace: Path, control_doc: str):
 
 
 def run_wizard(config_path: Path, out_path: Path, heartbeat_out: Path, control_doc: str):
+    wizard_path = find_wizard_path()
     cmd = [
         "python",
-        str(WIZARD_PATH),
+        str(wizard_path),
         "--non-interactive",
         "--config",
         str(config_path),
@@ -119,7 +153,8 @@ def main():
 
     if args.interactive:
         # In interactive mode, invoke the wizard directly (user input required)
-        cmd = ["python", str(WIZARD_PATH), "--out", str(project_md), "--heartbeat-out", str(heartbeat_md), "--control-doc", control_doc_name]
+        wizard_path = find_wizard_path()
+        cmd = ["python", str(wizard_path), "--out", str(project_md), "--heartbeat-out", str(heartbeat_md), "--control-doc", control_doc_name]
         subprocess.run(cmd, check=True)
     else:
         if not args.config:
