@@ -1,0 +1,4 @@
+interface:
+  display_name: "Cortex GOV Projects GUI"
+  short_description: "Launch a dashboard to manage Cortex GOV projects"
+  default_prompt: "Use $cortex-gov-gui to launch the Cortex GOV projects dashboard."
