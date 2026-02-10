@@ -32,3 +32,11 @@ artifacts/_tmp*
 
 # Accidental nested copies
 skills/cortex-gov-project/cortex-gov-project/
+
+# Local workspace docs and runtime artifacts
+AGENTS.md
+IDENTITY.md
+SOUL.md
+TOOLS.md
+USER.md
+artifacts/
