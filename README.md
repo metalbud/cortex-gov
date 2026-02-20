@@ -67,6 +67,11 @@ For the extended version, see:
 
 `docs/AUTONOMOUS_AGENT_RUNBOOK.md`
 
+## Token optimization
+To reduce governance token overhead while keeping verification strong, use:
+
+`docs/LEAN_EVIDENCE_STANDARD.md`
+
 ---
 
 ## Philosophy

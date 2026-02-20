@@ -57,14 +57,13 @@ Acceptance Criteria:
 - [ ] <Outcome-based criterion 3>
 
 Verification Evidence:
+<!-- Lean evidence rule: keep this minimal to reduce token burn -->
 - File paths:
-  - <path/to/output-1>
-  - <path/to/output-2>
+  - <primary-output-path>
 - Commands/output:
-  - <command run>
-  - <key output>
+  - <validation-command> -> <short result>
 - Notes:
-  - <important implementation/validation notes>
+  - <criteria satisfied + why>
 
 ---
 
