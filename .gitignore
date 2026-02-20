@@ -22,6 +22,8 @@ Thumbs.db
 # Wizard outputs (repo root)
 PROJECT.md
 HEARTBEAT.md
+PROJECT_IDEAS.md
+PROJECT_IDEAS_ARCHIVE.md
 
 # Wizard-generated files (keep repo clean)
 tools/wizard/PROJECT.md
