@@ -433,57 +433,6 @@ class GuiHandler(BaseHTTPRequestHandler):
             )
             self._send_json(200, payload)
             return
-        if path.startswith("/api/project-content"):
-            query_params = urlparse(self.path).query
-            params = dict(param.split('=') for param in query_params.split('&') if '=' in param)
-            project_path = params.get('path')
-            if project_path:
-                try:
-                    project_file = Path(project_path) / PROJECT_DOC_NAME
-                    if project_file.exists():
-                        content = project_file.read_text(encoding='utf-8')
-                        self._send_json(200, {"content": content})
-                    else:
-                        self._send_json(404, {"error": f"PROJECT.md not found at {project_path}"})
-                except Exception as e:
-                    self._send_json(500, {"error": str(e)})
-            else:
-                self._send_json(400, {"error": "Project path parameter required"})
-            return
-        if path == "/api/project-content" and self.command == "POST":
-            try:
-                payload = self._read_json()
-                project_path = payload.get('path')
-                content = payload.get('content')
-                
-                if not project_path or content is None:
-                    self._send_json(400, {"error": "Project path and content are required"})
-                    return
-                
-                project_file = Path(project_path) / PROJECT_DOC_NAME
-                if not project_file.exists():
-                    self._send_json(404, {"error": f"PROJECT.md not found at {project_path}"})
-                    return
-                
-                # Backup the original file before saving
-                backup_path = project_file.with_suffix(f'{project_file.suffix}.backup.{int(time.time())}')
-                if project_file.exists():
-                    import shutil
-                    shutil.copy2(project_file, backup_path)
-                
-                # Write the new content
-                project_file.write_text(content, encoding='utf-8')
-                
-                # Return success response with content to confirm the save
-                self._send_json(200, {
-                    "success": True, 
-                    "message": "PROJECT.md updated successfully",
-                    "content": content,
-                    "backup_path": str(backup_path)
-                })
-            except Exception as e:
-                self._send_json(500, {"error": str(e)})
-            return
         self._send(404, b"Not Found", "text/plain; charset=utf-8")
 
     def do_POST(self) -> None:
@@ -634,11 +583,65 @@ def parse_args() -> argparse.Namespace:
     ap.add_argument("--open", action="store_true", help="Open the GUI in a browser on start")
     ap.add_argument("--openclaw-profile", default=None, help="OpenClaw profile name (optional)")
     ap.add_argument("--openclaw-dev", action="store_true", help="Use OpenClaw --dev profile (isolated state)")
+    ap.add_argument("--daemon", action="store_true", help="Launch in background (detached)")
+    ap.add_argument("--log", default=None, help="Log file for background mode (optional)")
     return ap.parse_args()
+
+
+def _spawn_detached(args: argparse.Namespace) -> None:
+    import tempfile
+    import sys as _sys
+
+    cmd = [
+        _sys.executable,
+        str(Path(__file__).resolve()),
+        "--host",
+        args.host,
+        "--port",
+        str(args.port),
+        "--scan-depth",
+        str(args.scan_depth),
+    ]
+    if args.workspace:
+        cmd.extend(["--workspace", str(args.workspace)])
+    if args.open:
+        cmd.append("--open")
+    if args.openclaw_profile:
+        cmd.extend(["--openclaw-profile", args.openclaw_profile])
+    if args.openclaw_dev:
+        cmd.append("--openclaw-dev")
+
+    log_path = args.log or str(Path(tempfile.gettempdir()) / "cortex-gov-gui.log")
+    log_file = open(log_path, "a", encoding="utf-8")
+
+    if os.name == "nt":
+        DETACHED_PROCESS = 0x00000008
+        CREATE_NEW_PROCESS_GROUP = 0x00000200
+        subprocess.Popen(
+            cmd,
+            stdout=log_file,
+            stderr=log_file,
+            stdin=subprocess.DEVNULL,
+            creationflags=DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP,
+        )
+    else:
+        subprocess.Popen(
+            cmd,
+            stdout=log_file,
+            stderr=log_file,
+            stdin=subprocess.DEVNULL,
+            start_new_session=True,
+        )
+
+    print(f"Launched in background. Log: {log_path}")
 
 
 def main() -> None:
     args = parse_args()
+    if args.daemon:
+        _spawn_detached(args)
+        return
+
     agents_cfg: Optional[Dict[str, Any]] = None
     if not args.workspace:
         try:

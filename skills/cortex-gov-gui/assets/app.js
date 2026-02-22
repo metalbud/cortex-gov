@@ -2,6 +2,7 @@ const state = {
   data: null,
   selectedProject: null,
   filter: "",
+  currentProjectMdContent: "",
 };
 
 const ui = {
@@ -11,6 +12,9 @@ const ui = {
   projectList: document.getElementById("project-list"),
   projectCount: document.getElementById("project-count"),
   projectDetails: document.getElementById("project-details"),
+  projectMdDisplay: document.getElementById("project-md-display"),
+  projectMdEditor: document.getElementById("project-md-editor"),
+  projectMdTextarea: document.getElementById("project-md-textarea"),
   agentsList: document.getElementById("agents-list"),
   search: document.getElementById("search"),
   spawnForm: document.getElementById("spawn-form"),
@@ -21,6 +25,10 @@ const ui = {
   spawnHeartbeat: document.getElementById("spawn-heartbeat"),
   spawnPrompt: document.getElementById("spawn-prompt"),
   spawnBinds: document.getElementById("spawn-binds"),
+  refreshProjectMdBtn: document.getElementById("refresh-project-md"),
+  toggleEditModeBtn: document.getElementById("toggle-edit-mode"),
+  saveProjectMdBtn: document.getElementById("save-project-md"),
+  cancelEditBtn: document.getElementById("cancel-edit"),
 };
 
 const DEFAULT_PROMPT = (controlDoc) =>
@@ -117,11 +125,195 @@ function renderProjects() {
   });
 }
 
+async function loadProjectMdContent(projectPath) {
+  if (!projectPath) {
+    ui.projectMdDisplay.innerHTML = '<p class="placeholder">No project selected</p>';
+    return;
+  }
+  
+  try {
+    setStatus("Loading PROJECT.md...");
+    const response = await fetch(`/api/project-content?path=${encodeURIComponent(projectPath)}`);
+    const result = await response.json();
+    
+    if (!response.ok) {
+      throw new Error(result.error || "Failed to load PROJECT.md");
+    }
+    
+    // Store content for potential editing
+    state.currentProjectMdContent = result.content;
+    
+    // Simple markdown rendering
+    const markdownContent = result.content;
+    const htmlContent = markdownToHtml(markdownContent);
+    ui.projectMdDisplay.innerHTML = htmlContent;
+    ui.projectMdTextarea.value = markdownContent;
+    setStatus("");
+  } catch (error) {
+    ui.projectMdDisplay.innerHTML = `<p class="placeholder error">Error loading PROJECT.md: ${error.message}</p>`;
+    setStatus(`Error loading PROJECT.md: ${error.message}`, true);
+  }
+}
+
+async function saveProjectMdContent(projectPath, content) {
+  if (!projectPath) {
+    setStatus("No project selected", true);
+    return false;
+  }
+  
+  try {
+    setStatus("Saving PROJECT.md...");
+    const response = await fetch('/api/project-content', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        path: projectPath,
+        content: content
+      })
+    });
+    const result = await response.json();
+    
+    if (!response.ok) {
+      throw new Error(result.error || "Failed to save PROJECT.md");
+    }
+    
+    setStatus("PROJECT.md saved successfully!");
+    return true;
+  } catch (error) {
+    setStatus(`Error saving PROJECT.md: ${error.message}`, true);
+    return false;
+  }
+}
+
+function toggleEditMode(enabled) {
+  if (enabled) {
+    // Switch to edit mode
+    ui.projectMdDisplay.style.display = 'none';
+    ui.projectMdEditor.style.display = 'block';
+    ui.toggleEditModeBtn.textContent = 'View';
+    ui.projectMdTextarea.focus();
+  } else {
+    // Switch to view mode
+    ui.projectMdDisplay.style.display = 'block';
+    ui.projectMdEditor.style.display = 'none';
+    ui.toggleEditModeBtn.textContent = 'Edit';
+  }
+}
+
+// More robust markdown to HTML converter for PROJECT.md
+function markdownToHtml(md) {
+  let html = md;
+  
+  // Split content into lines to process them individually
+  const lines = html.split('\n');
+  let result = [];
+  let inUl = false;
+  let inOl = false;
+  
+  for (let i = 0; i < lines.length; i++) {
+    let line = lines[i];
+    let trimmedLine = line.trim();
+    
+    // Handle headings
+    if (trimmedLine.startsWith('# ')) {
+      if (inUl) { result.push('</ul>'); inUl = false; }
+      if (inOl) { result.push('</ol>'); inOl = false; }
+      result.push(`<h1>${escapeHtml(trimmedLine.substring(2))}</h1>`);
+      continue;
+    } else if (trimmedLine.startsWith('## ')) {
+      if (inUl) { result.push('</ul>'); inUl = false; }
+      if (inOl) { result.push('</ol>'); inOl = false; }
+      result.push(`<h2>${escapeHtml(trimmedLine.substring(3))}</h2>`);
+      continue;
+    } else if (trimmedLine.startsWith('### ')) {
+      if (inUl) { result.push('</ul>'); inUl = false; }
+      if (inOl) { result.push('</ol>'); inOl = false; }
+      result.push(`<h3>${escapeHtml(trimmedLine.substring(4))}</h3>`);
+      continue;
+    }
+    
+    // Handle list items
+    if (trimmedLine.match(/^\d+\.\s+/)) { // Ordered list item
+      if (inUl) { result.push('</ul>'); inUl = false; }
+      if (!inOl) { result.push('<ol>'); inOl = true; }
+      const content = trimmedLine.replace(/^\d+\.\s+/, '');
+      result.push(`<li>${processInlineMarkdown(escapeHtml(content))}</li>`);
+      continue;
+    } else if (trimmedLine.startsWith('- ') || trimmedLine.startsWith('* ')) { // Unordered list item
+      if (inOl) { result.push('</ol>'); inOl = false; }
+      if (!inUl) { result.push('<ul>'); inUl = true; }
+      const content = trimmedLine.replace(/^[-*]\s+/, '');
+      result.push(`<li>${processInlineMarkdown(escapeHtml(content))}</li>`);
+      continue;
+    }
+    
+    // Handle blank lines to close lists
+    if (!trimmedLine) {
+      if (inUl) { result.push('</ul>'); inUl = false; }
+      if (inOl) { result.push('</ol>'); inOl = false; }
+      continue;
+    }
+    
+    // Handle regular paragraphs
+    if (inUl) { result.push('</ul>'); inUl = false; }
+    if (inOl) { result.push('</ol>'); inOl = false; }
+    
+    // Handle code blocks (fenced)
+    if (trimmedLine.startsWith('```')) {
+      // Find the closing ```
+      let codeBlock = [];
+      i++; // Move to next line
+      while (i < lines.length && !lines[i].trim().startsWith('```')) {
+        codeBlock.push(lines[i]);
+        i++;
+      }
+      result.push(`<pre><code>${escapeHtml(codeBlock.join('\n'))}</code></pre>`);
+      continue;
+    }
+    
+    // Regular paragraph with inline markdown
+    result.push(`<p>${processInlineMarkdown(escapeHtml(trimmedLine))}</p>`);
+  }
+  
+  // Close any remaining open lists
+  if (inUl) { result.push('</ul>'); }
+  if (inOl) { result.push('</ol>'); }
+  
+  return result.join('');
+}
+
+// Process inline markdown elements (bold, italic, code, links)
+function processInlineMarkdown(text) {
+  return text
+    // Bold: **text** or __text__
+    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+    .replace(/__(.*?)__/g, '<strong>$1</strong>')
+    // Italic: *text* or _text_
+    .replace(/\*(.*?)\*/g, '<em>$1</em>')
+    .replace(/_(.*?)_/g, '<em>$1</em>')
+    // Code: `code`
+    .replace(/`(.*?)`/g, '<code>$1</code>')
+    // Links: [text](url)
+    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank">$1</a>');
+}
+
+// Simple HTML escaping function
+function escapeHtml(unsafe) {
+  return unsafe
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
 function renderProjectDetails() {
   const data = state.data;
   const project = data.projects.find((p) => p.path === state.selectedProject);
   if (!project) {
     ui.projectDetails.innerHTML = `<div class="project-details"><h2>No project selected</h2></div>`;
+    loadProjectMdContent(null);
+    toggleEditMode(false); // Ensure we're in view mode
     return;
   }
 
@@ -143,6 +335,9 @@ function renderProjectDetails() {
       </div>
     </div>
   `;
+  
+  // Load PROJECT.md content for the selected project
+  loadProjectMdContent(project.path);
 }
 
 function renderAgents() {
@@ -271,6 +466,60 @@ function syncSpawnDefaults() {
 }
 
 ui.refreshBtn.addEventListener("click", () => fetchState());
+ui.refreshProjectMdBtn.addEventListener("click", () => {
+  const project = state.data?.projects?.find((p) => p.path === state.selectedProject);
+  if (project) {
+    loadProjectMdContent(project.path);
+  }
+});
+
+ui.toggleEditModeBtn.addEventListener("click", () => {
+  const project = state.data?.projects?.find((p) => p.path === state.selectedProject);
+  if (!project) {
+    setStatus("Please select a project first", true);
+    return;
+  }
+  
+  // Toggle between edit and view modes
+  const isCurrentlyEditing = ui.projectMdEditor.style.display !== 'none';
+  toggleEditMode(!isCurrentlyEditing);
+});
+
+ui.saveProjectMdBtn.addEventListener("click", async () => {
+  const project = state.data?.projects?.find((p) => p.path === state.selectedProject);
+  if (!project) {
+    setStatus("Please select a project first", true);
+    return;
+  }
+  
+  const newContent = ui.projectMdTextarea.value;
+  const success = await saveProjectMdContent(project.path, newContent);
+  
+  if (success) {
+    // Reload the content to update the display
+    loadProjectMdContent(project.path);
+    // Switch back to view mode
+    toggleEditMode(false);
+  }
+});
+
+ui.cancelEditBtn.addEventListener("click", () => {
+  // Confirm if there are unsaved changes
+  if (state.currentProjectMdContent !== ui.projectMdTextarea.value) {
+    const confirmed = confirm("You have unsaved changes. Are you sure you want to cancel?");
+    if (!confirmed) return;
+  }
+  
+  // Reload the content to revert any changes
+  const project = state.data?.projects?.find((p) => p.path === state.selectedProject);
+  if (project) {
+    loadProjectMdContent(project.path);
+  }
+  
+  // Switch back to view mode
+  toggleEditMode(false);
+});
+
 ui.search.addEventListener("input", (evt) => {
   state.filter = evt.target.value || "";
   renderProjects();

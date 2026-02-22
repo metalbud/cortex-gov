@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Cortex GOV Projects Console</title>
+    <link rel="stylesheet" href="/styles.css" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+    </style>
+  </head>
+  <body>
+    <div class="gradient-bg"></div>
+    <div class="app-container">
+      <!-- Header -->
+      <header class="modern-header">
+        <div class="header-content">
+          <div class="brand-section">
+            <div class="logo-container">
+              <div class="logo">C</div>
+            </div>
+            <div class="brand-text">
+              <h1 class="brand-title">Cortex GOV</h1>
+              <p class="brand-subtitle">Projects Console</p>
+            </div>
+          </div>
+          <div class="header-actions">
+            <div class="workspace-indicator">
+              <svg class="icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M22 19a2 2 0 0 1-2-2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+              </svg>
+              <span id="workspace-path" class="workspace-path">Loading...</span>
+            </div>
+            <button id="refresh-btn" class="modern-btn modern-btn-primary">
+              <svg class="btn-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M23 4v6h-6M1 4v6h6M20.5 15.5a2.5 2.5 0 0 1 0-5 0 2.5 2.5 0 0 1 0 5 0"/>
+              </svg>
+              Rescan
+            </button>
+          </div>
+        </div>
+      </header>
+
+      <!-- Status Banner -->
+      <div id="status" class="status-banner hidden"></div>
+
+      <!-- Main Content -->
+      <div class="main-layout">
+        <!-- Sidebar -->
+        <aside class="modern-sidebar">
+          <div class="sidebar-header">
+            <div class="sidebar-title">
+              <svg class="icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="3" y="3" width="7" height="7"/>
+                <rect x="14" y="3" width="7" height="7"/>
+                <rect x="14" y="14" width="7" height="7"/>
+                <rect x="3" y="14" width="7" height="7"/>
+              </svg>
+              <span>Projects</span>
+            </div>
+            <div class="project-count-badge">
+              <span id="project-count">0</span>
+            </div>
+          </div>
+          
+          <div class="search-container">
+            <svg class="search-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="11" cy="11" r="8"/>
+              <path d="M21 21l-4.35-4.35"/>
+            </svg>
+            <input id="search" class="modern-search" type="search" placeholder="Filter projects..." />
+          </div>
+          
+          <div id="project-list" class="project-list"></div>
+        </aside>
+
+        <!-- Content Area -->
+        <main class="content-area">
+          <div id="project-details" class="project-details"></div>
+
+          <div class="content-section">
+            <div class="section-header">
+              <div class="section-header-content">
+                <div class="section-title">
+                  <svg class="icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"/>
+                    <path d="M12 8v4M12 16h.01"/>
+                  </svg>
+                  <h2>Agents</h2>
+                </div>
+                <p class="section-subtitle">Manage agents for this project workspace</p>
+              </div>
+            </div>
+            <div id="agents-list" class="agents-container"></div>
+          </div>
+
+          <div class="content-section">
+            <div class="section-header">
+              <div class="section-header-content">
+                <div class="section-title">
+                  <svg class="icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"/>
+                    <path d="M12 6v6l4 2"/>
+                  </svg>
+                  <h2>Spawn Agent</h2>
+                </div>
+                <p class="section-subtitle">Create new agents scoped to this project</p>
+              </div>
+            </div>
+            <form id="spawn-form" class="spawn-form">
+              <div class="form-grid">
+                <div class="form-group">
+                  <label class="form-label">
+                    <svg class="label-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <circle cx="12" cy="12" r="10"/>
+                      <path d="M12 8v4M12 16h.01"/>
+                    </svg>
+                    Agent ID
+                    <span class="label-badge">Optional</span>
+                  </label>
+                  <input id="spawn-id" class="modern-input" type="text" placeholder="e.g. analytics-bot" />
+                </div>
+                
+                <div class="form-group">
+                  <label class="form-label">
+                    <svg class="label-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M20 7h-9M14 17H5M17 17V3M5 21v-8"/>
+                    </svg>
+                    Prefix
+                  </label>
+                  <input id="spawn-prefix" class="modern-input" type="text" placeholder="Auto-generated base name" />
+                </div>
+                
+                <div class="form-group">
+                  <label class="form-label">
+                    <svg class="label-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M4 6h16M4 10h16M4 14h16M4 18h16"/>
+                    </svg>
+                    Count
+                  </label>
+                  <input id="spawn-count" class="modern-input modern-input-number" type="number" min="1" value="1" />
+                </div>
+                
+                <div class="form-group full-width">
+                  <label class="form-label">
+                    <svg class="label-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <circle cx="12" cy="12" r="10"/>
+                      <path d="M12 8v4M12 16h.01"/>
+                    </svg>
+                    Model Override
+                    <span class="label-badge">Optional</span>
+                  </label>
+                  <input id="spawn-model" class="modern-input" type="text" placeholder="Leave empty to inherit default" />
+                </div>
+                
+                <div class="form-group full-width">
+                  <label class="form-label">
+                    <svg class="label-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <circle cx="12" cy="12" r="10"/>
+                      <path d="M12 6v6l4 2"/>
+                    </svg>
+                    Heartbeat Interval
+                    <span class="label-badge">Optional</span>
+                  </label>
+                  <input id="spawn-heartbeat" class="modern-input" type="text" placeholder="e.g. 30m, 2h, 1d" />
+                </div>
+                
+                <div class="form-group full-width">
+                  <label class="form-label">
+                    <svg class="label-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                    </svg>
+                    Heartbeat Prompt
+                    <span class="label-badge">Optional</span>
+                  </label>
+                  <textarea id="spawn-prompt" class="modern-textarea" rows="3" placeholder="Override default heartbeat prompt"></textarea>
+                </div>
+                
+                <div class="form-group full-width">
+                  <label class="form-label">
+                    <svg class="label-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M9 18V5l12-2v13M9 9h12"/>
+                    </svg>
+                    Bind Channels
+                    <span class="label-badge">Optional</span>
+                  </label>
+                  <input id="spawn-binds" class="modern-input" type="text" placeholder="channel:account, channel2:account2" />
+                </div>
+              </div>
+              
+              <div class="form-actions">
+                <button type="submit" class="modern-btn modern-btn-primary modern-btn-large">
+                  <svg class="btn-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="12" y1="5" x2="12" y2="19"/>
+                    <line x1="5" y1="12" x2="19" y2="12"/>
+                  </svg>
+                  Create Agent(s)
+                </button>
+              </div>
+            </form>
+          </div>
+        </main>
+      </div>
+    </div>
+
+    <script src="/app.js"></script>
+  </body>
+</html>

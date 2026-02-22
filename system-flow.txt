@@ -1,0 +1,301 @@
+A recursive system for an AI agent improving the project it’s working on is a closed feedback loop where the agent repeatedly:
+
+
+observes the current project state
+
+
+evaluates it against goals and constraints
+
+
+proposes changes
+
+
+applies (or stages) changes
+
+
+verifies outcomes
+
+
+updates its understanding and repeats
+
+
+Below are common “looks” for this, from simple to robust.
+1) Minimal recursive loop (single-agent “reflect and edit”)
+Flow
+
+
+Sense: read repo/docs/tickets/logs/tests/metrics
+
+
+Judge: identify issues (bugs, missing tests, tech debt, perf bottlenecks)
+
+
+Plan: rank improvements by impact/cost/risk
+
+
+Act: implement a small change
+
+
+Check: run tests/benchmarks/lint; compare metrics
+
+
+Record: write a note (why, what changed, results)
+
+
+Repeat
+
+
+Key property: recursion happens because the output (changes + new measurements) becomes the next input.
+2) “Critic + Builder” recursive system (two-role loop)
+This is a common stable pattern.
+Roles
+
+
+Builder: makes code/doc changes
+
+
+Critic: reviews diffs, finds flaws, suggests better approach, adds constraints
+
+
+Loop
+
+
+Builder proposes patch (small, atomic).
+
+
+Critic evaluates patch against:
+
+
+requirements
+
+
+style guides
+
+
+security/performance constraints
+
+
+regressions risk
+
+
+
+
+Critic returns actionable feedback.
+
+
+Builder revises patch.
+
+
+Automated checks run (tests/lint/bench).
+
+
+If checks pass and Critic approves, merge; otherwise repeat.
+
+
+Benefit: reduces self-confirmation errors.
+3) Tool-driven recursive improvement (agent + instrumentation)
+Here the agent relies on real signals, not just “opinion.”
+Inputs the agent watches
+
+
+CI results (test failures, flaky tests)
+
+
+Code coverage
+
+
+Static analysis (lint, type errors)
+
+
+Perf benchmarks
+
+
+Error logs, traces, crash reports
+
+
+Dependency vulnerability scans
+
+
+Product metrics (latency, conversion, retention) if applicable
+
+
+Loop
+
+
+Detect regression or opportunity (e.g., “p95 latency increased 12% after commit X”)
+
+
+Propose candidate fixes
+
+
+Implement behind a feature flag
+
+
+Run controlled validation (A/B or canary)
+
+
+Promote or roll back
+
+
+Update rules/heuristics (“this pattern causes N+1 queries”)
+
+
+4) Hierarchical recursion (project-level goals → task-level fixes)
+A more “agentic” recursive system separates strategy from tactics.
+Layers
+
+
+Executive layer (Goals & Roadmap):
+
+
+defines success metrics and constraints
+
+
+picks quarterly/weekly priorities
+
+
+
+
+Planner layer (Backlog & Decomposition):
+
+
+turns goals into tasks, milestones, acceptance tests
+
+
+
+
+Worker layer (Implementation):
+
+
+executes tasks, writes code/tests/docs
+
+
+
+
+Verifier layer (Quality Gate):
+
+
+runs checks, audits diffs, validates acceptance criteria
+
+
+
+
+Recursion
+
+
+Worker changes project → Verifier measures → Planner reprioritizes → Executive updates goals (if needed)
+
+
+5) What the “improvement detection” actually looks like
+The agent typically uses a rubric + scoring model:
+Example categories
+
+
+Correctness (bugs, edge cases)
+
+
+Maintainability (duplication, complexity, naming, module boundaries)
+
+
+Test quality (coverage, flaky tests, missing critical path tests)
+
+
+Security (secrets, injection risks, unsafe dependencies)
+
+
+Performance (hot paths, memory use, database queries)
+
+
+UX/product (flow friction, clarity, accessibility)
+
+
+DevEx (build time, tooling, documentation)
+
+
+Prioritization formula (typical)
+
+
+Impact × Confidence ÷ Effort, with a risk penalty:
+
+
+score = (impact * confidence / effort) - risk
+
+
+
+
+6) Safety and control mechanisms (what makes it reliable)
+A practical recursive system includes guardrails so it doesn’t “improve” itself into a mess.
+
+
+Small patches: restrict change size per iteration
+
+
+Quality gates: tests/lint/type checks required
+
+
+Rollback plan: feature flags, revertable commits
+
+
+Approval policy: human approval for risky areas (auth, payments, infra)
+
+
+Change budget: limit how many files/modules touched per loop
+
+
+Memory/logbook: record decisions and outcomes to avoid repeating mistakes
+
+
+7) Concrete pseudo-architecture (high level)
+State
+
+
+Project snapshot (repo, docs, tickets)
+
+
+Metrics snapshot (CI, perf, errors)
+
+
+Constraints (style, security, roadmap)
+
+
+Learned “rules” (what worked before)
+
+
+Recursive cycle
+
+
+analyze_state() -> findings
+
+
+select_next_improvement(findings) -> task
+
+
+implement(task) -> patch
+
+
+verify(patch) -> results
+
+
+update_knowledge(task, results)
+
+
+repeat until stop condition (time, budget, stability threshold)
+
+
+8) Stop conditions (when recursion halts)
+Good systems define when to stop:
+
+
+all checks green and metrics stable
+
+
+marginal improvements below threshold
+
+
+iteration budget reached
+
+
+uncertainty too high → escalate to human
+
+
+If you describe your project type (software repo, business workflow, research write-up, etc.) and what signals you have available (CI, logs, metrics), I can outline a version of this loop that fits it (including roles, gates, and what the agent should measure each cycle).

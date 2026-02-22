@@ -1,0 +1,175 @@
+{
+  "project_name": "Mobile Application",
+  "project_slug": "mobile-app",
+  "summary": "A cross-platform mobile application with core features and user engagement.",
+  "constraints": [
+    "Cross-platform compatibility (iOS/Android)",
+    "Offline-first capabilities",
+    "Performance on low-end devices"
+  ],
+  "epics": [
+    {
+      "key": "E001",
+      "title": "Core Application",
+      "outcome": [
+        "App structure and navigation",
+        "User authentication and profiles"
+      ]
+    },
+    {
+      "key": "E002",
+      "title": "Features and Functionality",
+      "outcome": [
+        "Data management and synchronization",
+        "User engagement features"
+      ]
+    }
+  ],
+  "tasks": [
+    {
+      "key": "H001",
+      "title": "Project setup and architecture",
+      "epic": "E001",
+      "status": "TODO",
+      "priority": "P0",
+      "owner": "agent",
+      "work": [
+        "Initialize cross-platform project",
+        "Set up navigation and routing",
+        "Configure build environments"
+      ],
+      "acceptance": [
+        "Project builds for both platforms",
+        "Navigation works between screens",
+        "Development environment is ready"
+      ],
+      "verification_steps": [
+        "Run project setup script",
+        "Test navigation between key screens",
+        "Verify build configurations"
+      ],
+      "evidence_fields": [
+        "File paths",
+        "Commands/output",
+        "Screenshots",
+        "Notes"
+      ]
+    },
+    {
+      "key": "H002",
+      "title": "Authentication system",
+      "epic": "E001",
+      "status": "TODO",
+      "priority": "P0",
+      "owner": "agent",
+      "work": [
+        "Implement login and registration",
+        "Session management",
+        "Password recovery"
+      ],
+      "acceptance": [
+        "Users can create accounts",
+        "Login system works",
+        "Session persists across app restarts"
+      ],
+      "verification_steps": [
+        "Test user registration flow",
+        "Verify login credentials",
+        "Test session persistence"
+      ],
+      "evidence_fields": [
+        "File paths",
+        "Commands/output",
+        "Screenshots",
+        "Notes"
+      ]
+    },
+    {
+      "key": "H003",
+      "title": "Data models and storage",
+      "epic": "E002",
+      "status": "TODO",
+      "priority": "P1",
+      "owner": "agent",
+      "work": [
+        "Design data models",
+        "Implement offline storage",
+        "Set up data synchronization"
+      ],
+      "acceptance": [
+        "Data models are defined",
+        "App works offline",
+        "Data syncs when online"
+      ],
+      "verification_steps": [
+        "Create sample data entries",
+        "Test offline functionality",
+        "Verify data synchronization"
+      ],
+      "evidence_fields": [
+        "File paths",
+        "Commands/output",
+        "Screenshots",
+        "Notes"
+      ]
+    },
+    {
+      "key": "H004",
+      "title": "Core feature implementation",
+      "epic": "E002",
+      "status": "TODO",
+      "priority": "P1",
+      "owner": "agent",
+      "work": [
+        "Implement primary app features",
+        "Add user interactions",
+        "Create UI components"
+      ],
+      "acceptance": [
+        "Core features function",
+        "UI is responsive",
+        "User interactions work"
+      ],
+      "verification_steps": [
+        "Test all features",
+        "Check UI responsiveness",
+        "Verify user workflows"
+      ],
+      "evidence_fields": [
+        "File paths",
+        "Screenshots",
+        "Commands/output",
+        "Notes"
+      ]
+    },
+    {
+      "key": "H005",
+      "title": "Testing and deployment",
+      "epic": "E002",
+      "status": "TODO",
+      "priority": "P2",
+      "owner": "agent",
+      "work": [
+        "Write unit tests",
+        "Add integration tests",
+        "Configure app store builds"
+      ],
+      "acceptance": [
+        "Test suite passes",
+        "App builds for stores",
+        "Documentation is complete"
+      ],
+      "verification_steps": [
+        "Run test suite",
+        "Generate app store builds",
+        "Review documentation"
+      ],
+      "evidence_fields": [
+        "File paths",
+        "Commands/output",
+        "Notes",
+        "URLs"
+      ]
+    }
+  ]
+}

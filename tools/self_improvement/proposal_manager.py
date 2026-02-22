@@ -1,0 +1,1468 @@
+﻿
+"""Cortex-GOV H010 improvement proposal and validation workflow CLI.
+
+This command-line tool provides:
+1) A strict proposal format with required fields.
+2) Submission from either human or meta-agent origins.
+3) Approval gating before implementation (human review or autonomous policy).
+4) Implementation tracking with rollback backups.
+5) Outcome measurement and append-only event logs.
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import shutil
+import subprocess
+import sys
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any, Dict, List
+
+from safety_guardian import (
+    DEFAULT_AUDIT_LOG_PATH as DEFAULT_H011_AUDIT_LOG_PATH,
+    comprehensive_validation,
+    log_audit_event,
+)
+
+BASE_DIR = Path(__file__).resolve().parents[2]
+DEFAULT_STORE_PATH = BASE_DIR / "artifacts" / "proposals" / "H010-proposals.json"
+DEFAULT_EVENT_LOG_PATH = BASE_DIR / "artifacts" / "metrics" / "H010-proposal-events.json"
+DEFAULT_OUTCOME_LOG_PATH = BASE_DIR / "artifacts" / "metrics" / "H010-proposal-outcomes.json"
+DEFAULT_SUMMARY_PATH = BASE_DIR / "artifacts" / "metrics" / "H010-proposal-summary.md"
+DEFAULT_BACKUP_DIR = BASE_DIR / "artifacts" / "proposals" / "backups"
+DEFAULT_SAFETY_AUDIT_LOG = DEFAULT_H011_AUDIT_LOG_PATH
+DEFAULT_H013_CONTEXT_PATH = BASE_DIR / "artifacts" / "metrics" / "H013-planning-context.json"
+DEFAULT_H013_TRENDS_PATH = BASE_DIR / "artifacts" / "verification" / "H013-brave-trends.md"
+DEFAULT_IMPLEMENT_CHECK_TIMEOUT_SEC = 600
+
+STATUSES = [
+    "PENDING_REVIEW",
+    "NEEDS_REVISION",
+    "APPROVED",
+    "REJECTED",
+    "IMPLEMENTED",
+    "ROLLED_BACK",
+]
+RISK_LEVELS = ["low", "medium", "high"]
+PROPOSAL_TYPES = ["workflow", "task_template", "metric", "instruction", "safety", "other"]
+REQUIRED_SCHEMA_FIELDS = [
+    "id",
+    "title",
+    "type",
+    "source",
+    "status",
+    "proposedBy",
+    "proposedAt",
+    "proposal.what",
+    "proposal.why",
+    "proposal.evidence",
+    "proposal.expectedImpact",
+    "proposal.riskAssessment.level",
+    "proposal.rollbackPlan",
+    "humanGate.required",
+]
+
+
+class ProposalError(RuntimeError):
+    """Domain error for proposal workflow operations."""
+
+
+def utc_now() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+def load_h013_context() -> Dict[str, Any] | None:
+    """Load H013 Brave Search planning context for trend-aware proposal generation."""
+    try:
+        if DEFAULT_H013_CONTEXT_PATH.exists():
+            with open(DEFAULT_H013_CONTEXT_PATH, 'r', encoding='utf-8') as f:
+                return json.load(f)
+    except Exception:
+        pass
+    
+    try:
+        # Fallback: try to find the latest H013 context file
+        metrics_dir = BASE_DIR / "artifacts" / "metrics"
+        if metrics_dir.exists():
+            h013_files = list(metrics_dir.glob("H013-planning-context-*.json"))
+            if h013_files:
+                latest_file = max(h013_files, key=lambda f: f.stat().st_mtime)
+                with open(latest_file, 'r', encoding='utf-8') as f:
+                    return json.load(f)
+    except Exception:
+        pass
+    
+    return None
+
+
+def enhance_proposal_with_trend_context(proposal: Dict[str, Any]) -> Dict[str, Any]:
+    """Enhance proposal with H013 trend context and evidence references."""
+    h013_context = load_h013_context()
+    
+    if h013_context:
+        # Add trend-aware insights to the proposal rationale
+        trend_section = {
+            "trendAwareness": {
+                "pulseGeneratedAt": h013_context.get("generatedAt"),
+                "pulseId": h013_context.get("pulseId"),
+                "trendSignals": h013_context.get("trendSignals", {}),
+                "guidance": h013_context.get("guidance", ""),
+            }
+        }
+        
+        # Update the proposal's why field with trend context
+        original_why = proposal["proposal"]["why"]
+        trend_context = h013_context.get("trendSignals", {})
+        buzzwords = trend_context.get("buzzwords", [])
+        competitors = trend_context.get("competitors", [])
+        
+        # Add trend-informed rationale
+        trend_rationale = f"\n\n[ TREND-AWARE CONTEXT: This proposal reflects current ecosystem momentum including "
+        if buzzwords:
+            trend_rationale += f"key trends: {', '.join(buzzwords[:5])}"
+        if competitors:
+            trend_rationale += f"; competitive landscape: {', '.join(competitors[:3])}"
+        trend_rationale += f". Generated from Brave Search pulse {h013_context.get('pulseId')}. ]"
+        
+        proposal["proposal"]["why"] = original_why + trend_rationale
+        
+        # Add H013 context to evidence references
+        if isinstance(proposal["proposal"]["evidence"], list):
+            # Convert existing string evidence to list of dicts if needed
+            evidence_list = proposal["proposal"]["evidence"]
+            if not isinstance(evidence_list[0], dict) if evidence_list else True:
+                # Convert string evidence to dict format
+                formatted_evidence = [{"type": "reference", "source": str(e)} for e in evidence_list if str(e).strip()]
+                proposal["proposal"]["evidence"] = formatted_evidence
+        
+        # Reference the H013 planning context as evidence
+        h013_evidence = {
+            "type": "trend_analysis",
+            "source": "H013_brave_pulse",
+            "generatedAt": h013_context.get("generatedAt"),
+            "description": "Brave Search trend analysis informing proposal direction",
+            "trendKeywords": buzzwords[:10],  # Top 10 keywords
+            "relevantCompetitors": competitors[:5],  # Top 5 competitors
+            "contextReference": str(DEFAULT_H013_CONTEXT_PATH),
+            "trendsReference": str(DEFAULT_H013_TRENDS_PATH)
+        }
+        
+        # Add H013 evidence if not already present
+        existing_h013 = any(e.get("type") == "trend_analysis" for e in proposal["proposal"]["evidence"])
+        if not existing_h013:
+            proposal["proposal"]["evidence"].append(h013_evidence)
+        
+        # Add the pulse ID to the proposal ID for traceability
+        proposal["trendPulseId"] = h013_context.get("pulseId")
+        
+        # Log the enhancement
+        print(f"Enhanced proposal {proposal['id']} with H013 trend context: {h013_context.get('pulseId')}")
+    else:
+        print(f"H013 context not found, proceeding without trend enhancement for proposal {proposal['id']}")
+    
+    return proposal
+
+
+def ensure_parent(path: Path) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+
+
+def load_json_array(path: Path) -> List[Dict[str, Any]]:
+    if not path.exists():
+        return []
+    data = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(data, list):
+        raise ProposalError(f"{path} must contain a JSON array.")
+    return data
+
+
+def append_json_array(path: Path, entry: Dict[str, Any]) -> None:
+    data = load_json_array(path)
+    data.append(entry)
+    ensure_parent(path)
+    path.write_text(json.dumps(data, indent=2), encoding="utf-8")
+
+
+def load_store(path: Path) -> Dict[str, Any]:
+    if not path.exists():
+        return {"version": 1, "updatedAt": utc_now(), "proposals": []}
+
+    raw = json.loads(path.read_text(encoding="utf-8"))
+    if isinstance(raw, list):
+        # Legacy fallback: older versions stored only a top-level list.
+        return {"version": 1, "updatedAt": utc_now(), "proposals": raw}
+    if not isinstance(raw, dict):
+        raise ProposalError(f"{path} must contain either an object or an array.")
+
+    proposals = raw.get("proposals", [])
+    if not isinstance(proposals, list):
+        raise ProposalError("Store field 'proposals' must be a list.")
+
+    raw.setdefault("version", 1)
+    raw.setdefault("updatedAt", utc_now())
+    raw["proposals"] = proposals
+    return raw
+
+
+def save_store(path: Path, store: Dict[str, Any]) -> None:
+    store["updatedAt"] = utc_now()
+    ensure_parent(path)
+    path.write_text(json.dumps(store, indent=2), encoding="utf-8")
+
+
+def require_text(name: str, value: str) -> str:
+    cleaned = (value or "").strip()
+    if not cleaned:
+        raise ProposalError(f"Field '{name}' is required.")
+    return cleaned
+
+
+def human_gate_required(proposal: Dict[str, Any]) -> bool:
+    gate = proposal.get("humanGate", {})
+    if not isinstance(gate, dict):
+        return True
+    return bool(gate.get("required", True))
+
+
+def cleaned_list(values: List[str] | None) -> List[str]:
+    if not values:
+        return []
+    return [item.strip() for item in values if item and item.strip()]
+
+
+def nested_get(data: Dict[str, Any], dotted_path: str) -> Any:
+    cursor: Any = data
+    for part in dotted_path.split("."):
+        if not isinstance(cursor, dict) or part not in cursor:
+            return None
+        cursor = cursor[part]
+    return cursor
+
+
+def validate_schema_fields(proposal: Dict[str, Any]) -> None:
+    for field_path in REQUIRED_SCHEMA_FIELDS:
+        value = nested_get(proposal, field_path)
+        if value is None:
+            raise ProposalError(
+                f"Proposal {proposal.get('id', '<unknown>')} is missing required field '{field_path}'."
+            )
+        if isinstance(value, str) and not value.strip():
+            raise ProposalError(
+                f"Proposal {proposal.get('id', '<unknown>')} has empty required field '{field_path}'."
+            )
+        if isinstance(value, list) and not value:
+            raise ProposalError(
+                f"Proposal {proposal.get('id', '<unknown>')} has empty required field '{field_path}'."
+            )
+
+
+def next_proposal_id(proposals: List[Dict[str, Any]]) -> str:
+    day = datetime.now(timezone.utc).strftime("%Y%m%d")
+    prefix = f"PROP-{day}-"
+    used = [p.get("id", "") for p in proposals if str(p.get("id", "")).startswith(prefix)]
+    return f"{prefix}{len(used) + 1:03d}"
+
+
+def find_proposal(store: Dict[str, Any], proposal_id: str) -> Dict[str, Any]:
+    for proposal in store["proposals"]:
+        if proposal.get("id") == proposal_id:
+            return proposal
+    raise ProposalError(f"Proposal '{proposal_id}' was not found.")
+
+
+def append_history(
+    proposal: Dict[str, Any],
+    *,
+    action: str,
+    actor: str,
+    note: str,
+    from_status: str,
+    to_status: str,
+    metadata: Dict[str, Any] | None = None,
+) -> Dict[str, Any]:
+    entry = {
+        "timestamp": utc_now(),
+        "action": action,
+        "actor": actor,
+        "note": note,
+        "fromStatus": from_status,
+        "toStatus": to_status,
+        "metadata": metadata or {},
+    }
+    proposal.setdefault("history", []).append(entry)
+    proposal["updatedAt"] = entry["timestamp"]
+    return entry
+
+
+def append_event_log(
+    path: Path,
+    proposal: Dict[str, Any],
+    history_entry: Dict[str, Any],
+) -> None:
+    entry = {
+        "timestamp": history_entry["timestamp"],
+        "proposalId": proposal["id"],
+        "status": proposal["status"],
+        "action": history_entry["action"],
+        "actor": history_entry["actor"],
+        "note": history_entry["note"],
+        "metadata": history_entry.get("metadata", {}),
+    }
+    append_json_array(path, entry)
+
+
+def ensure_status(proposal: Dict[str, Any], allowed_statuses: List[str], action_name: str) -> None:
+    current = proposal.get("status")
+    if current not in allowed_statuses:
+        raise ProposalError(
+            f"Cannot {action_name} proposal {proposal['id']} from status {current}. "
+            f"Allowed: {', '.join(allowed_statuses)}."
+        )
+
+
+def resolve_path(raw_path: str) -> Path:
+    path = Path(raw_path)
+    if path.is_absolute():
+        return path.resolve()
+    return (BASE_DIR / path).resolve()
+
+
+def make_backup(target: Path, proposal_id: str, backup_root: Path) -> Dict[str, str]:
+    timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    try:
+        relative = target.relative_to(BASE_DIR)
+        safe_name = str(relative).replace("\\", "__").replace("/", "__")
+    except ValueError:
+        safe_name = str(target).replace(":", "").replace("\\", "__").replace("/", "__")
+
+    backup_dir = backup_root / proposal_id
+    backup_dir.mkdir(parents=True, exist_ok=True)
+    backup_path = backup_dir / f"{timestamp}-{safe_name}.bak"
+    shutil.copy2(target, backup_path)
+    return {"original": str(target), "backup": str(backup_path)}
+
+
+def truncate_output(value: str, limit: int = 2000) -> str:
+    cleaned = (value or "").strip()
+    if len(cleaned) <= limit:
+        return cleaned
+    return f"{cleaned[:limit]}... [truncated]"
+
+
+def run_quality_checks(
+    commands: List[str],
+    *,
+    cwd: Path,
+    timeout_seconds: int,
+) -> Dict[str, Any]:
+    if timeout_seconds <= 0:
+        raise ProposalError("Quality-check timeout must be greater than zero seconds.")
+
+    checks: List[Dict[str, Any]] = []
+    for raw_command in commands:
+        command = require_text("quality-check", raw_command)
+        started_at = utc_now()
+        try:
+            completed = subprocess.run(
+                command,
+                shell=True,
+                capture_output=True,
+                text=True,
+                cwd=str(cwd),
+                timeout=timeout_seconds,
+            )
+            checks.append(
+                {
+                    "command": command,
+                    "startedAt": started_at,
+                    "finishedAt": utc_now(),
+                    "passed": completed.returncode == 0,
+                    "exitCode": completed.returncode,
+                    "stdout": truncate_output(completed.stdout),
+                    "stderr": truncate_output(completed.stderr),
+                }
+            )
+        except subprocess.TimeoutExpired as exc:
+            checks.append(
+                {
+                    "command": command,
+                    "startedAt": started_at,
+                    "finishedAt": utc_now(),
+                    "passed": False,
+                    "exitCode": None,
+                    "stdout": truncate_output(exc.stdout or ""),
+                    "stderr": truncate_output(exc.stderr or ""),
+                    "timeoutSeconds": timeout_seconds,
+                    "error": "timeout",
+                }
+            )
+
+    failed_commands = [item["command"] for item in checks if not item.get("passed")]
+    return {
+        "executedAt": utc_now(),
+        "checkCount": len(checks),
+        "passed": not failed_commands,
+        "failedCommands": failed_commands,
+        "checks": checks,
+    }
+
+
+def enforce_pre_implementation_quality_gates(
+    proposal: Dict[str, Any],
+    *,
+    actor: str,
+    quality_checks: List[str],
+    quality_check_cwd: Path,
+    quality_check_timeout_seconds: int,
+    safety_audit_log: Path,
+    project_md_path: Path,
+) -> Dict[str, Any]:
+    safety = run_safety_validation(
+        proposal,
+        actor=actor,
+        audit_log_path=safety_audit_log,
+        project_md_path=project_md_path,
+    )
+    proposal["safety"] = safety
+    if not safety.get("is_valid", False):
+        blocked = "; ".join(safety.get("blocked", [])) or "Unknown safety violation"
+        log_audit_event(
+            event_type="PROPOSAL_IMPLEMENTATION_GATES",
+            actor=actor,
+            target=proposal["id"],
+            result="BLOCK",
+            details={"reason": "safety_validation_failed", "blocked": safety.get("blocked", [])},
+            audit_log_path=safety_audit_log,
+        )
+        raise ProposalError(
+            f"Implementation quality gate failed for {proposal['id']}: safety validation blocked ({blocked})."
+        )
+
+    commands = cleaned_list(quality_checks)
+    if not commands:
+        raise ProposalError(
+            "At least one --quality-check command is required before implementation."
+        )
+
+    quality_report = run_quality_checks(
+        commands,
+        cwd=quality_check_cwd.resolve(),
+        timeout_seconds=quality_check_timeout_seconds,
+    )
+
+    gate_result = "PASS" if quality_report["passed"] else "BLOCK"
+    log_audit_event(
+        event_type="PROPOSAL_IMPLEMENTATION_GATES",
+        actor=actor,
+        target=proposal["id"],
+        result=gate_result,
+        details={
+            "qualityCheckCount": quality_report["checkCount"],
+            "failedCommands": quality_report["failedCommands"],
+            "cwd": str(quality_check_cwd.resolve()),
+            "timeoutSeconds": quality_check_timeout_seconds,
+        },
+        audit_log_path=safety_audit_log,
+    )
+
+    if not quality_report["passed"]:
+        failed_commands = "; ".join(quality_report["failedCommands"])
+        raise ProposalError(
+            f"Implementation quality gate failed for {proposal['id']}: verification command(s) failed: {failed_commands}"
+        )
+
+    return {
+        "checkedAt": utc_now(),
+        "safetyValidation": {
+            "is_valid": bool(safety.get("is_valid", False)),
+            "warnings": safety.get("warnings", []),
+            "blocked": safety.get("blocked", []),
+        },
+        "qualityChecks": quality_report,
+    }
+
+
+def parse_change_entries(changes: List[str] | None) -> List[Dict[str, str]]:
+    """Parse --change values in PATH[:ACTION] form."""
+    entries: List[Dict[str, str]] = []
+    for raw in cleaned_list(changes):
+        if ":" in raw:
+            path_part, action_part = raw.rsplit(":", 1)
+            action = action_part.strip().lower()
+            if action not in {"modify", "add", "delete"}:
+                raise ProposalError(
+                    f"Invalid change action '{action}' in '{raw}'. Use modify, add, or delete."
+                )
+            path = path_part.strip()
+        else:
+            path = raw
+            action = "modify"
+        if not path:
+            raise ProposalError(f"Invalid empty path in change entry '{raw}'.")
+        entries.append({"path": path, "action": action})
+    return entries
+
+
+def infer_target_file(change_set: List[Dict[str, str]], references: List[str]) -> str:
+    if change_set:
+        return change_set[0]["path"]
+    for reference in references:
+        if "." in Path(reference).name:
+            return reference
+    return "PROJECT.md"
+
+
+def run_safety_validation(
+    proposal: Dict[str, Any],
+    *,
+    actor: str,
+    audit_log_path: Path,
+    project_md_path: Path,
+) -> Dict[str, Any]:
+    """Evaluate H011 safety constraints for the proposal."""
+    proposal_data = proposal["proposal"]
+    change_set = proposal.get("changeSet", [])
+    references = proposal.get("references", [])
+    approval_rule = (
+        "approve-before-implement-required"
+        if human_gate_required(proposal)
+        else "autonomous-policy-gate"
+    )
+
+    proposed_changes: Dict[str, Any] = {
+        "title": proposal.get("title", ""),
+        "type": proposal.get("type", ""),
+        "what": proposal_data.get("what", ""),
+        "why": proposal_data.get("why", ""),
+        "rollbackPlan": proposal_data.get("rollbackPlan", ""),
+        "riskAssessment": proposal_data.get("riskAssessment", {}),
+        "relatedTasks": proposal.get("relatedTasks", []),
+        "references": references,
+        "changeSet": change_set,
+        "approval_rule": approval_rule,
+    }
+
+    if change_set:
+        status_related_paths = [item["path"] for item in change_set if "status" in item["path"].lower()]
+        if status_related_paths:
+            proposed_changes["status_changes"] = ",".join(status_related_paths)
+
+    target_file = infer_target_file(change_set, references)
+    action_counts = {"add": 0, "modify": 0, "delete": 0}
+    for item in change_set:
+        action_counts[item["action"]] += 1
+    change_type = (
+        f"proposal:{proposal.get('type', 'unknown')} add={action_counts['add']} "
+        f"modify={action_counts['modify']} delete={action_counts['delete']}"
+    )
+
+    project_md_content = project_md_path.read_text(encoding="utf-8") if project_md_path.exists() else None
+    report = comprehensive_validation(
+        proposed_changes=proposed_changes,
+        project_md_content=project_md_content,
+        target_file=target_file,
+        change_type=change_type,
+        actor=actor,
+        audit_log_path=audit_log_path,
+    )
+
+    # Additional scope guard for explicit delete actions in proposal changes.
+    if any(item["action"] == "delete" for item in change_set):
+        report = dict(report)
+        report["is_valid"] = False
+        report.setdefault("blocked", []).append("[scope] Delete actions are prohibited for autonomous proposals")
+        log_audit_event(
+            event_type="PROPOSAL_SCOPE_GUARD",
+            actor=actor,
+            target=target_file,
+            result="BLOCK",
+            details={"reason": "Delete action in changeSet", "changeSet": change_set},
+            audit_log_path=audit_log_path,
+        )
+
+    return report
+
+
+def append_modification_audit(
+    audit_log_path: Path,
+    *,
+    event_type: str,
+    actor: str,
+    proposal_id: str,
+    reason: str,
+    details: Dict[str, Any],
+) -> None:
+    log_audit_event(
+        event_type=event_type,
+        actor=actor,
+        target=proposal_id,
+        result="PASS",
+        details={"reason": reason, **details},
+        audit_log_path=audit_log_path,
+    )
+
+def render_summary(proposals: List[Dict[str, Any]]) -> str:
+    counts: Dict[str, int] = {status: 0 for status in STATUSES}
+    for proposal in proposals:
+        status = proposal.get("status", "")
+        counts[status] = counts.get(status, 0) + 1
+
+    lines: List[str] = [
+        "# H010 Proposal Workflow Summary",
+        "",
+        f"Generated at: {utc_now()}",
+        "",
+        "## Status counts",
+        "",
+        "| Status | Count |",
+        "| --- | ---: |",
+    ]
+    for status in STATUSES:
+        lines.append(f"| {status} | {counts.get(status, 0)} |")
+
+    lines.extend(
+        [
+            "",
+            "## Proposal tracking",
+            "",
+            "| ID | Status | Source | Type | Title | Outcome Metric | Outcome Success |",
+            "| --- | --- | --- | --- | --- | --- | --- |",
+        ]
+    )
+    for proposal in proposals:
+        outcome = proposal.get("outcome", {})
+        metric = outcome.get("metric", "")
+        success = outcome.get("success", "")
+        lines.append(
+            "| {id} | {status} | {source} | {type} | {title} | {metric} | {success} |".format(
+                id=proposal.get("id", ""),
+                status=proposal.get("status", ""),
+                source=proposal.get("source", ""),
+                type=proposal.get("type", ""),
+                title=str(proposal.get("title", "")).replace("|", "/"),
+                metric=metric,
+                success=success,
+            )
+        )
+
+    return "\n".join(lines)
+
+
+def cmd_schema(args: argparse.Namespace) -> None:
+    print("Required proposal fields:")
+    for field_path in REQUIRED_SCHEMA_FIELDS:
+        print(f"- {field_path}")
+    if args.example:
+        example = {
+            "id": "PROP-YYYYMMDD-001",
+            "title": "Example improvement",
+            "type": "workflow",
+            "source": "meta_agent",
+            "status": "PENDING_REVIEW",
+            "proposedBy": "meta-monitor",
+            "proposedAt": "2026-02-12T00:00:00Z",
+            "proposal": {
+                "what": "Describe the concrete change.",
+                "why": "Describe why the change is needed.",
+                "evidence": ["metrics/path.json", "analysis/path.md"],
+                "expectedImpact": "Quantify expected outcome.",
+                "riskAssessment": {
+                    "level": "medium",
+                    "concerns": ["Possible regression in task routing"],
+                    "mitigations": ["Rollback plan with backup restore"],
+                },
+                "rollbackPlan": "Restore backed-up files and mark proposal rolled back.",
+            },
+            "humanGate": {
+                "required": True,
+                "approvedBy": None,
+                "approvedAt": None,
+                "decisionNote": "",
+            },
+        }
+        print("\nExample JSON shape:")
+        print(json.dumps(example, indent=2))
+
+
+def cmd_create(args: argparse.Namespace) -> None:
+    store = load_store(args.store)
+    proposal_id = next_proposal_id(store["proposals"])
+    evidence = cleaned_list(args.evidence)
+    risk_concerns = cleaned_list(args.risk_concern)
+    risk_mitigations = cleaned_list(args.risk_mitigation)
+    change_set = parse_change_entries(args.change)
+    autonomous_mode = bool(getattr(args, "autonomous", False)) or args.approval_mode == "autonomous"
+
+    if not evidence:
+        raise ProposalError("At least one --evidence entry is required.")
+    if not risk_concerns:
+        if args.risk:
+            risk_concerns = [args.risk.strip()]
+        else:
+            risk_concerns = ["Potential regression in autonomous governance flow"]
+    if not risk_mitigations:
+        risk_mitigations = ["Use rollback backups and rerun validation before retry"]
+
+    now = utc_now()
+    initial_status = "APPROVED" if autonomous_mode else "PENDING_REVIEW"
+    decision_note = (
+        "Autonomous mode enabled; approval delegated to system policy."
+        if autonomous_mode
+        else ""
+    )
+    proposal = {
+        "id": proposal_id,
+        "title": require_text("title", args.title),
+        "type": args.type,
+        "source": args.source,
+        "status": initial_status,
+        "priority": args.priority,
+        "proposedBy": require_text("proposed-by", args.proposed_by),
+        "proposedAt": now,
+        "references": cleaned_list(args.reference),
+        "relatedTasks": cleaned_list(args.related_task),
+        "changeSet": change_set,
+        "proposal": {
+            "what": require_text("what", args.what),
+            "why": require_text("why", args.why),
+            "evidence": evidence,
+            "expectedImpact": require_text("expected-impact", args.expected_impact),
+            "riskAssessment": {
+                "level": args.risk_level,
+                "concerns": risk_concerns,
+                "mitigations": risk_mitigations,
+            },
+            "rollbackPlan": require_text("rollback-plan", args.rollback_plan),
+        },
+        "humanGate": {
+            "required": not autonomous_mode,
+            "approvedBy": "AUTONOMOUS_POLICY" if autonomous_mode else None,
+            "approvedAt": now if autonomous_mode else None,
+            "decisionNote": decision_note,
+        },
+        "implementation": {
+            "implementedBy": None,
+            "implementedAt": None,
+            "summary": "",
+            "changedFiles": [],
+            "backupMap": [],
+            "rollbackReady": False,
+            "rolledBackBy": None,
+            "rolledBackAt": None,
+            "rollbackReason": "",
+        },
+        "outcome": {
+            "metric": args.metric or "",
+            "baseline": "",
+            "target": args.target or "",
+            "actual": "",
+            "success": "",
+            "measuredBy": "",
+            "measuredAt": "",
+            "notes": "",
+        },
+        "createdAt": now,
+        "updatedAt": now,
+        "history": [],
+    }
+    
+    # Enhance proposal with H013 trend context before validation
+    proposal = enhance_proposal_with_trend_context(proposal)
+    
+    validate_schema_fields(proposal)
+
+    safety = run_safety_validation(
+        proposal,
+        actor=proposal["proposedBy"],
+        audit_log_path=args.safety_audit_log,
+        project_md_path=args.project_md_path,
+    )
+    proposal["safety"] = safety
+    if (not safety.get("is_valid")) or safety.get("scope_decision") == "BLOCKED":
+        raise ProposalError(
+            f"Safety validation blocked proposal creation: {'; '.join(safety.get('blocked', []))}"
+        )
+
+    history = append_history(
+        proposal,
+        action="AUTO_APPROVED" if autonomous_mode else "CREATED",
+        actor=proposal["proposedBy"],
+        note=decision_note or "Proposal submitted for human review.",
+        from_status=initial_status,
+        to_status=initial_status,
+        metadata={
+            "source": proposal["source"],
+            "type": proposal["type"],
+            "autonomousMode": autonomous_mode,
+        },
+    )
+    append_event_log(args.event_log, proposal, history)
+
+    store["proposals"].append(proposal)
+    save_store(args.store, store)
+    if autonomous_mode:
+        print(f"Created proposal {proposal_id} in status APPROVED (autonomous mode).")
+    else:
+        print(f"Created proposal {proposal_id} in status PENDING_REVIEW.")
+
+def cmd_list(args: argparse.Namespace) -> None:
+    store = load_store(args.store)
+    proposals = store["proposals"]
+    if args.status:
+        proposals = [item for item in proposals if item.get("status") == args.status]
+    if args.source:
+        proposals = [item for item in proposals if item.get("source") == args.source]
+
+    if not proposals:
+        print("No proposals found.")
+        return
+
+    print(f"{'ID':<18} {'STATUS':<16} {'SOURCE':<11} {'TYPE':<14} TITLE")
+    for proposal in proposals:
+        print(
+            f"{proposal['id']:<18} "
+            f"{proposal['status']:<16} "
+            f"{proposal.get('source', ''):<11} "
+            f"{proposal.get('type', ''):<14} "
+            f"{proposal.get('title', '')}"
+        )
+
+
+def cmd_show(args: argparse.Namespace) -> None:
+    store = load_store(args.store)
+    proposal = find_proposal(store, args.id)
+    print(json.dumps(proposal, indent=2))
+
+
+def cmd_request_changes(args: argparse.Namespace) -> None:
+    store = load_store(args.store)
+    proposal = find_proposal(store, args.id)
+    ensure_status(proposal, ["PENDING_REVIEW"], "request changes")
+    previous = proposal["status"]
+    proposal["status"] = "NEEDS_REVISION"
+    history = append_history(
+        proposal,
+        action="REQUEST_CHANGES",
+        actor=require_text("actor", args.actor),
+        note=require_text("note", args.note),
+        from_status=previous,
+        to_status=proposal["status"],
+    )
+    append_event_log(args.event_log, proposal, history)
+    save_store(args.store, store)
+    print(f"Proposal {proposal['id']} moved {previous} -> NEEDS_REVISION.")
+
+
+def cmd_resubmit(args: argparse.Namespace) -> None:
+    store = load_store(args.store)
+    proposal = find_proposal(store, args.id)
+    ensure_status(proposal, ["NEEDS_REVISION"], "resubmit")
+    previous = proposal["status"]
+    proposal["status"] = "PENDING_REVIEW"
+    history = append_history(
+        proposal,
+        action="RESUBMITTED",
+        actor=require_text("actor", args.actor),
+        note=require_text("note", args.note),
+        from_status=previous,
+        to_status=proposal["status"],
+    )
+    append_event_log(args.event_log, proposal, history)
+    save_store(args.store, store)
+    print(f"Proposal {proposal['id']} moved {previous} -> PENDING_REVIEW.")
+
+
+def cmd_approve(args: argparse.Namespace) -> None:
+    store = load_store(args.store)
+    proposal = find_proposal(store, args.id)
+    if not human_gate_required(proposal):
+        print(
+            f"Proposal {proposal['id']} already uses autonomous gating; manual approval is not required."
+        )
+        return
+    ensure_status(proposal, ["PENDING_REVIEW"], "approve")
+    actor = require_text("actor", args.actor)
+
+    safety = run_safety_validation(
+        proposal,
+        actor=actor,
+        audit_log_path=args.safety_audit_log,
+        project_md_path=args.project_md_path,
+    )
+    proposal["safety"] = safety
+    if (not safety.get("is_valid")) or safety.get("scope_decision") == "BLOCKED":
+        previous = proposal["status"]
+        proposal["status"] = "NEEDS_REVISION"
+        history = append_history(
+            proposal,
+            action="SAFETY_BLOCKED",
+            actor=actor,
+            note="Safety guardian blocked approval.",
+            from_status=previous,
+            to_status=proposal["status"],
+            metadata=safety,
+        )
+        append_event_log(args.event_log, proposal, history)
+        save_store(args.store, store)
+        raise ProposalError(
+            f"Safety validation blocked approval for {proposal['id']}: "
+            f"{'; '.join(safety.get('blocked', []))}"
+        )
+
+    previous = proposal["status"]
+    proposal["status"] = "APPROVED"
+    gate = proposal.setdefault("humanGate", {})
+    gate["required"] = True
+    gate["approvedBy"] = actor
+    gate["approvedAt"] = utc_now()
+    gate["decisionNote"] = (args.note or "").strip()
+    history = append_history(
+        proposal,
+        action="APPROVED",
+        actor=gate["approvedBy"],
+        note=gate["decisionNote"] or "Approved by human reviewer.",
+        from_status=previous,
+        to_status=proposal["status"],
+    )
+    append_event_log(args.event_log, proposal, history)
+    save_store(args.store, store)
+    print(f"Proposal {proposal['id']} moved {previous} -> APPROVED.")
+
+
+def cmd_reject(args: argparse.Namespace) -> None:
+    store = load_store(args.store)
+    proposal = find_proposal(store, args.id)
+    ensure_status(proposal, ["PENDING_REVIEW", "NEEDS_REVISION"], "reject")
+    previous = proposal["status"]
+    proposal["status"] = "REJECTED"
+    gate = proposal.setdefault("humanGate", {})
+    gate.setdefault("required", True)
+    gate["approvedBy"] = require_text("actor", args.actor)
+    gate["approvedAt"] = utc_now()
+    gate["decisionNote"] = require_text("note", args.note)
+    history = append_history(
+        proposal,
+        action="REJECTED",
+        actor=gate["approvedBy"],
+        note=gate["decisionNote"],
+        from_status=previous,
+        to_status=proposal["status"],
+    )
+    append_event_log(args.event_log, proposal, history)
+    save_store(args.store, store)
+    print(f"Proposal {proposal['id']} moved {previous} -> REJECTED.")
+
+
+def cmd_implement(args: argparse.Namespace) -> None:
+    store = load_store(args.store)
+    proposal = find_proposal(store, args.id)
+    gate = proposal.get("humanGate", {})
+    implementer = require_text("actor", args.actor)
+    gate_required = human_gate_required(proposal)
+    allowed_statuses = ["APPROVED"] if gate_required else ["APPROVED", "PENDING_REVIEW"]
+    ensure_status(proposal, allowed_statuses, "implement")
+    if gate_required and not gate.get("approvedBy"):
+        raise ProposalError(
+            f"Proposal {proposal['id']} cannot be implemented because the human gate is not satisfied."
+        )
+
+    quality_gates = enforce_pre_implementation_quality_gates(
+        proposal,
+        actor=implementer,
+        quality_checks=args.quality_check,
+        quality_check_cwd=args.quality_check_cwd,
+        quality_check_timeout_seconds=args.quality_check_timeout_sec,
+        safety_audit_log=args.safety_audit_log,
+        project_md_path=args.project_md_path,
+    )
+
+    backup_targets = cleaned_list(args.backup_target)
+    if not backup_targets:
+        raise ProposalError(
+            "At least one --backup-target is required to preserve rollback capability."
+        )
+
+    backup_map: List[Dict[str, str]] = []
+    for raw_target in backup_targets:
+        target = resolve_path(raw_target)
+        if not target.exists() or not target.is_file():
+            raise ProposalError(f"Backup target does not exist or is not a file: {target}")
+        backup_map.append(make_backup(target, proposal["id"], args.backup_root))
+
+    changed_files = [str(resolve_path(path)) for path in cleaned_list(args.changed_file)]
+
+    previous = proposal["status"]
+    proposal["status"] = "IMPLEMENTED"
+    implementation = proposal.setdefault("implementation", {})
+    implementation["implementedBy"] = implementer
+    implementation["implementedAt"] = utc_now()
+    implementation["summary"] = require_text("summary", args.summary)
+    implementation["changedFiles"] = changed_files
+    implementation["backupMap"] = backup_map
+    implementation["rollbackReady"] = bool(backup_map)
+    implementation["qualityGates"] = quality_gates
+
+    history = append_history(
+        proposal,
+        action="IMPLEMENTED",
+        actor=implementation["implementedBy"],
+        note=implementation["summary"],
+        from_status=previous,
+        to_status=proposal["status"],
+        metadata={
+            "changedFiles": changed_files,
+            "backupCount": len(backup_map),
+            "approvedBy": gate.get("approvedBy"),
+            "qualityCheckCount": quality_gates["qualityChecks"]["checkCount"],
+        },
+    )
+    append_event_log(args.event_log, proposal, history)
+    append_modification_audit(
+        args.safety_audit_log,
+        event_type="PROPOSAL_IMPLEMENTED",
+        actor=implementation["implementedBy"],
+        proposal_id=proposal["id"],
+        reason=implementation["summary"],
+        details={
+            "changedFiles": changed_files,
+            "backupCount": len(backup_map),
+            "approvedBy": gate.get("approvedBy"),
+            "qualityCheckCount": quality_gates["qualityChecks"]["checkCount"],
+        },
+    )
+    save_store(args.store, store)
+    print(
+        f"Proposal {proposal['id']} moved {previous} -> IMPLEMENTED "
+        f"with {len(backup_map)} backup snapshot(s)."
+    )
+
+def cmd_measure(args: argparse.Namespace) -> None:
+    store = load_store(args.store)
+    proposal = find_proposal(store, args.id)
+    ensure_status(proposal, ["IMPLEMENTED", "ROLLED_BACK"], "record outcome")
+
+    outcome = proposal.setdefault("outcome", {})
+    outcome["metric"] = require_text("metric", args.metric)
+    outcome["baseline"] = require_text("baseline", args.baseline)
+    outcome["target"] = require_text("target", args.target)
+    outcome["actual"] = require_text("actual", args.actual)
+    outcome["success"] = args.success
+    outcome["measuredBy"] = require_text("actor", args.actor)
+    outcome["measuredAt"] = utc_now()
+    outcome["notes"] = (args.notes or "").strip()
+
+    current = proposal["status"]
+    history = append_history(
+        proposal,
+        action="OUTCOME_RECORDED",
+        actor=outcome["measuredBy"],
+        note=outcome["notes"] or "Outcome measurement recorded.",
+        from_status=current,
+        to_status=current,
+        metadata={
+            "metric": outcome["metric"],
+            "baseline": outcome["baseline"],
+            "target": outcome["target"],
+            "actual": outcome["actual"],
+            "success": outcome["success"],
+        },
+    )
+    append_event_log(args.event_log, proposal, history)
+    append_json_array(
+        args.outcome_log,
+        {
+            "timestamp": outcome["measuredAt"],
+            "proposalId": proposal["id"],
+            "status": proposal["status"],
+            "metric": outcome["metric"],
+            "baseline": outcome["baseline"],
+            "target": outcome["target"],
+            "actual": outcome["actual"],
+            "success": outcome["success"],
+            "notes": outcome["notes"],
+        },
+    )
+    save_store(args.store, store)
+    print(f"Outcome recorded for proposal {proposal['id']}.")
+
+
+def cmd_rollback(args: argparse.Namespace) -> None:
+    store = load_store(args.store)
+    proposal = find_proposal(store, args.id)
+    ensure_status(proposal, ["IMPLEMENTED"], "rollback")
+
+    implementation = proposal.get("implementation", {})
+    backup_map = implementation.get("backupMap", [])
+    if not backup_map:
+        raise ProposalError(
+            f"Proposal {proposal['id']} has no backup snapshots, so rollback cannot be automated."
+        )
+
+    restored_files: List[str] = []
+    for mapping in backup_map:
+        backup_path = Path(mapping["backup"])
+        original_path = Path(mapping["original"])
+        if not backup_path.exists():
+            raise ProposalError(f"Backup file missing: {backup_path}")
+        original_path.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(backup_path, original_path)
+        restored_files.append(str(original_path))
+
+    previous = proposal["status"]
+    proposal["status"] = "ROLLED_BACK"
+    implementation["rolledBackBy"] = require_text("actor", args.actor)
+    implementation["rolledBackAt"] = utc_now()
+    implementation["rollbackReason"] = require_text("reason", args.reason)
+
+    history = append_history(
+        proposal,
+        action="ROLLED_BACK",
+        actor=implementation["rolledBackBy"],
+        note=implementation["rollbackReason"],
+        from_status=previous,
+        to_status=proposal["status"],
+        metadata={"restoredFiles": restored_files},
+    )
+    append_event_log(args.event_log, proposal, history)
+    append_modification_audit(
+        args.safety_audit_log,
+        event_type="PROPOSAL_ROLLED_BACK",
+        actor=implementation["rolledBackBy"],
+        proposal_id=proposal["id"],
+        reason=implementation["rollbackReason"],
+        details={"restoredFiles": restored_files},
+    )
+    save_store(args.store, store)
+    print(
+        f"Proposal {proposal['id']} moved {previous} -> ROLLED_BACK "
+        f"after restoring {len(restored_files)} file(s)."
+    )
+
+
+def cmd_summary(args: argparse.Namespace) -> None:
+    store = load_store(args.store)
+    output = args.output
+    output.parent.mkdir(parents=True, exist_ok=True)
+    output.write_text(render_summary(store["proposals"]), encoding="utf-8")
+    print(f"Summary written to {output}")
+
+
+def cmd_validate(args: argparse.Namespace) -> None:
+    store = load_store(args.store)
+    issues: List[str] = []
+    for proposal in store["proposals"]:
+        try:
+            validate_schema_fields(proposal)
+        except ProposalError as exc:
+            issues.append(str(exc))
+            continue
+
+        if proposal.get("status") in {"IMPLEMENTED", "ROLLED_BACK"}:
+            gate = proposal.get("humanGate", {})
+            if human_gate_required(proposal) and not gate.get("approvedBy"):
+                issues.append(
+                    f"Proposal {proposal['id']} is {proposal['status']} but has no human approval."
+                )
+            implementation = proposal.get("implementation", {})
+            if not implementation.get("backupMap"):
+                issues.append(
+                    f"Proposal {proposal['id']} is {proposal['status']} but has no rollback backups."
+                )
+            quality_gates = implementation.get("qualityGates", {})
+            quality_checks = (
+                quality_gates.get("qualityChecks", {})
+                if isinstance(quality_gates, dict)
+                else {}
+            )
+            if not quality_checks or not quality_checks.get("checkCount"):
+                issues.append(
+                    f"Proposal {proposal['id']} is {proposal['status']} but has no recorded quality checks."
+                )
+            elif not quality_checks.get("passed", False):
+                issues.append(
+                    f"Proposal {proposal['id']} is {proposal['status']} but recorded failing quality checks."
+                )
+
+    if issues:
+        for issue in issues:
+            print(f"- {issue}")
+        raise ProposalError(f"Validation failed with {len(issues)} issue(s).")
+
+    print(f"Validated {len(store['proposals'])} proposal(s). No schema or governance issues found.")
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description="Manage Cortex-GOV H010 proposals with approval-gated workflow."
+    )
+    parser.add_argument(
+        "--store",
+        type=Path,
+        default=DEFAULT_STORE_PATH,
+        help="Path to proposal store JSON.",
+    )
+    parser.add_argument(
+        "--event-log",
+        type=Path,
+        default=DEFAULT_EVENT_LOG_PATH,
+        help="Append-only proposal event log path.",
+    )
+    parser.add_argument(
+        "--outcome-log",
+        type=Path,
+        default=DEFAULT_OUTCOME_LOG_PATH,
+        help="Append-only outcome measurement log path.",
+    )
+    parser.add_argument(
+        "--safety-audit-log",
+        type=Path,
+        default=DEFAULT_SAFETY_AUDIT_LOG,
+        help="H011 safety audit log path.",
+    )
+    parser.add_argument(
+        "--project-md-path",
+        type=Path,
+        default=BASE_DIR / "PROJECT.md",
+        help="PROJECT.md path used by H011 one-task validation.",
+    )
+    parser.add_argument(
+        "--approval-mode",
+        choices=["autonomous", "human"],
+        default="autonomous",
+        help="Proposal gate mode. 'autonomous' is default; use 'human' to require manual approval.",
+    )
+    parser.add_argument(
+        "--autonomous",
+        action="store_true",
+        help=argparse.SUPPRESS,
+    )
+    subparsers = parser.add_subparsers(dest="command", required=True)
+
+    schema_parser = subparsers.add_parser("schema", help="Print required proposal fields.")
+    schema_parser.add_argument(
+        "--example",
+        action="store_true",
+        help="Print an example JSON payload.",
+    )
+    schema_parser.set_defaults(func=cmd_schema)
+
+    create_parser = subparsers.add_parser("create", help="Create/submit a new proposal.")
+    create_parser.add_argument("--title", required=True, help="Proposal title.")
+    create_parser.add_argument(
+        "--type",
+        required=True,
+        choices=PROPOSAL_TYPES,
+        help="Proposal type.",
+    )
+    create_parser.add_argument(
+        "--source",
+        choices=["human", "meta_agent"],
+        default="meta_agent",
+        help="Who originated the proposal.",
+    )
+    create_parser.add_argument(
+        "--priority",
+        choices=["P0", "P1", "P2"],
+        default="P1",
+        help="Proposal priority.",
+    )
+    create_parser.add_argument("--proposed-by", "--owner", dest="proposed_by", required=True, help="Originator name/id.")
+    create_parser.add_argument("--what", required=True, help="What changes.")
+    create_parser.add_argument("--why", required=True, help="Why the change is needed.")
+    create_parser.add_argument(
+        "--evidence",
+        action="append",
+        required=True,
+        help="Evidence reference. Pass multiple times for multiple entries.",
+    )
+    create_parser.add_argument(
+        "--expected-impact",
+        "--impact",
+        dest="expected_impact",
+        required=True,
+        help="Expected impact statement.",
+    )
+    create_parser.add_argument(
+        "--risk-level",
+        choices=RISK_LEVELS,
+        default="medium",
+        help="Risk level for the proposed change.",
+    )
+    create_parser.add_argument(
+        "--risk-concern",
+        action="append",
+        help="Risk concern. Pass multiple times if needed.",
+    )
+    create_parser.add_argument(
+        "--risk-mitigation",
+        action="append",
+        help="Mitigation action. Pass multiple times if needed.",
+    )
+    create_parser.add_argument(
+        "--risk",
+        help="Legacy risk text. Converted into a concern if --risk-concern is omitted.",
+    )
+    create_parser.add_argument(
+        "--rollback-plan",
+        required=True,
+        help="Rollback approach if the implementation causes regressions.",
+    )
+    create_parser.add_argument(
+        "--reference",
+        action="append",
+        help="Optional supporting file or URL reference.",
+    )
+    create_parser.add_argument(
+        "--related-task",
+        action="append",
+        help="Optional related task ID(s), e.g. H010.",
+    )
+    create_parser.add_argument(
+        "--metric",
+        help="Optional expected outcome metric name.",
+    )
+    create_parser.add_argument(
+        "--target",
+        help="Optional target value for the selected metric.",
+    )
+    create_parser.add_argument(
+        "--change",
+        action="append",
+        help="Proposed file change in PATH[:ACTION] format; ACTION is add|modify|delete.",
+    )
+    create_parser.set_defaults(func=cmd_create)
+
+    list_parser = subparsers.add_parser("list", help="List proposals.")
+    list_parser.add_argument("--status", choices=STATUSES, help="Filter by proposal status.")
+    list_parser.add_argument(
+        "--source",
+        choices=["human", "meta_agent"],
+        help="Filter by proposal source.",
+    )
+    list_parser.set_defaults(func=cmd_list)
+
+    show_parser = subparsers.add_parser("show", help="Show a proposal as JSON.")
+    show_parser.add_argument("--id", required=True, help="Proposal ID.")
+    show_parser.set_defaults(func=cmd_show)
+
+    request_changes = subparsers.add_parser(
+        "request-changes", help="Move a proposal into NEEDS_REVISION."
+    )
+    request_changes.add_argument("--id", required=True, help="Proposal ID.")
+    request_changes.add_argument("--actor", required=True, help="Human reviewer.")
+    request_changes.add_argument("--note", required=True, help="Required revision details.")
+    request_changes.set_defaults(func=cmd_request_changes)
+
+    resubmit = subparsers.add_parser("resubmit", help="Resubmit a revised proposal for review.")
+    resubmit.add_argument("--id", required=True, help="Proposal ID.")
+    resubmit.add_argument("--actor", required=True, help="Resubmitting actor.")
+    resubmit.add_argument("--note", required=True, help="Summary of applied revisions.")
+    resubmit.set_defaults(func=cmd_resubmit)
+
+    approve = subparsers.add_parser("approve", help="Manual approval gate.")
+    approve.add_argument("--id", required=True, help="Proposal ID.")
+    approve.add_argument("--actor", required=True, help="Human reviewer name/id.")
+    approve.add_argument("--note", help="Approval note.")
+    approve.set_defaults(func=cmd_approve)
+
+    reject = subparsers.add_parser("reject", help="Reject a proposal.")
+    reject.add_argument("--id", required=True, help="Proposal ID.")
+    reject.add_argument("--actor", required=True, help="Human reviewer name/id.")
+    reject.add_argument("--note", required=True, help="Rejection reason.")
+    reject.set_defaults(func=cmd_reject)
+
+    implement = subparsers.add_parser(
+        "implement", help="Mark an approved proposal as implemented with rollback backups."
+    )
+    implement.add_argument("--id", required=True, help="Proposal ID.")
+    implement.add_argument("--actor", required=True, help="Implementing agent or engineer.")
+    implement.add_argument("--summary", required=True, help="Implementation summary.")
+    implement.add_argument(
+        "--changed-file",
+        action="append",
+        help="File path changed by implementation (for audit trail).",
+    )
+    implement.add_argument(
+        "--backup-target",
+        action="append",
+        help="File path to snapshot for rollback (required, can be repeated).",
+    )
+    implement.add_argument(
+        "--backup-root",
+        type=Path,
+        default=DEFAULT_BACKUP_DIR,
+        help="Directory where rollback backups are stored.",
+    )
+    implement.add_argument(
+        "--quality-check",
+        action="append",
+        required=True,
+        help="Verification command that must pass before implementation (repeat for tests/lint/benchmarks).",
+    )
+    implement.add_argument(
+        "--quality-check-cwd",
+        type=Path,
+        default=BASE_DIR,
+        help="Working directory used when running --quality-check commands.",
+    )
+    implement.add_argument(
+        "--quality-check-timeout-sec",
+        type=int,
+        default=DEFAULT_IMPLEMENT_CHECK_TIMEOUT_SEC,
+        help="Timeout in seconds for each --quality-check command.",
+    )
+    implement.set_defaults(func=cmd_implement)
+
+    measure = subparsers.add_parser("measure", help="Record measured outcome for a proposal.")
+    measure.add_argument("--id", required=True, help="Proposal ID.")
+    measure.add_argument("--actor", required=True, help="Who measured the outcome.")
+    measure.add_argument("--metric", required=True, help="Metric name.")
+    measure.add_argument("--baseline", required=True, help="Baseline value.")
+    measure.add_argument("--target", required=True, help="Target value.")
+    measure.add_argument("--actual", required=True, help="Observed value.")
+    measure.add_argument(
+        "--success",
+        choices=["yes", "no"],
+        required=True,
+        help="Whether the result met expectations.",
+    )
+    measure.add_argument("--notes", help="Optional notes.")
+    measure.set_defaults(func=cmd_measure)
+
+    rollback = subparsers.add_parser(
+        "rollback", help="Restore backups and mark an implemented proposal as rolled back."
+    )
+    rollback.add_argument("--id", required=True, help="Proposal ID.")
+    rollback.add_argument("--actor", required=True, help="Who executed the rollback.")
+    rollback.add_argument("--reason", required=True, help="Rollback reason.")
+    rollback.set_defaults(func=cmd_rollback)
+
+    summary = subparsers.add_parser("summary", help="Write a Markdown summary of proposal status.")
+    summary.add_argument(
+        "--output",
+        type=Path,
+        default=DEFAULT_SUMMARY_PATH,
+        help="Summary output path.",
+    )
+    summary.set_defaults(func=cmd_summary)
+
+    validate = subparsers.add_parser(
+        "validate", help="Validate schema requirements and approval-gate invariants."
+    )
+    validate.set_defaults(func=cmd_validate)
+
+    return parser.parse_args()
+
+
+def main() -> None:
+    args = parse_args()
+    try:
+        args.func(args)
+    except ProposalError as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        raise SystemExit(1) from exc
+
+
+if __name__ == "__main__":
+    main()

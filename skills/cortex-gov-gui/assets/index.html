@@ -44,6 +44,29 @@
           <section class="panel">
             <div class="panel-header">
               <div>
+                <h3>Project Plan</h3>
+                <p>Conversational view of PROJECT.md for this project</p>
+              </div>
+              <div class="panel-actions">
+                <button id="toggle-edit-mode" class="btn secondary">Edit</button>
+                <button id="refresh-project-md" class="btn secondary">Refresh</button>
+              </div>
+            </div>
+            <div id="project-md-display" class="markdown-content">
+              <p class="placeholder">Select a project to view its PROJECT.md content</p>
+            </div>
+            <div id="project-md-editor" class="editor-container" style="display: none;">
+              <textarea id="project-md-textarea" class="editor-textarea" placeholder="PROJECT.md content will appear here..."></textarea>
+              <div class="editor-actions">
+                <button id="save-project-md" class="btn primary">Save Changes</button>
+                <button id="cancel-edit" class="btn secondary">Cancel</button>
+              </div>
+            </div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-header">
+              <div>
                 <h3>Agents</h3>
                 <p>Agents linked to this project workspace</p>
               </div>
